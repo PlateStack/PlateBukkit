@@ -1,0 +1,3 @@
+[submodule "plate-common"]
+	path = plate-common
+	url = https://github.com/PlateStack/PlateCommon.git
