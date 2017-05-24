@@ -16,21 +16,17 @@
 
 package org.platestack.bukkit.message
 
+import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import org.platestack.api.message.Language
 import org.platestack.api.message.Text
 import org.platestack.api.message.Translator
+import org.platestack.common.message.TextConverter
 
-class BukkitTranslator: Translator {
-    override fun toJson(text: Text, language: Language): String {
-        val root = JsonObject()
-        text.style.apply {
-            color?.let {
-                root.addProperty("color", it.id)
-            }
+class BukkitTranslator: Translator, TextConverter {
+    override fun toJson(text: Text, language: Language) = translate(text.toJson(JsonObject()), language).toString()
 
-        }
-
-        return root.toString()
+    override fun translate(jsonElement: JsonElement, language: Language): JsonElement {
+        TODO("not implemented")
     }
 }
