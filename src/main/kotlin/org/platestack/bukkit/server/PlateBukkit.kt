@@ -16,9 +16,10 @@
 
 package org.platestack.bukkit.server
 
+import com.google.gson.JsonObject
 import org.bukkit.Bukkit
 import org.bukkit.plugin.java.JavaPlugin
-import org.platestack.api.message.Translator
+import org.platestack.api.message.Text
 import org.platestack.api.minecraft.Minecraft
 import org.platestack.api.minecraft.MinecraftServer
 import org.platestack.api.plugin.PlatePlugin
@@ -27,6 +28,7 @@ import org.platestack.api.server.PlateServer
 import org.platestack.api.server.PlateStack
 import org.platestack.api.server.PlatformNamespace
 import org.platestack.api.server.internal.InternalAccessor
+import org.platestack.bukkit.message.BukkitTranslator
 import org.platestack.bukkit.plugin.BukkitNamespace
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -34,10 +36,11 @@ import org.slf4j.LoggerFactory
 class PlateBukkit: PlateServer, JavaPlugin() {
     override val platformName: String get() = "bukkit"
     override val platform = PlatformNamespace("bukkit" to Version.parse(Bukkit.getBukkitVersion()))
-    override lateinit var translator: Translator
+    override lateinit var translator: BukkitTranslator
 
     override fun onEnable() {
         PlateStack = this
+        translator = BukkitTranslator()
         Minecraft.server = object : MinecraftServer {
             override val version = Version.parse(Bukkit.getVersion())
         }
@@ -49,6 +52,8 @@ class PlateBukkit: PlateServer, JavaPlugin() {
     }
 
     override val internal = object : InternalAccessor {
+        override fun toJson(text: Text) = translator.run { text.toJson(JsonObject()) }
+
         override fun createLogger(plugin: PlatePlugin): Logger {
             return LoggerFactory.getLogger(plugin.javaClass)
         }
