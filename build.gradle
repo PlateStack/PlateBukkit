@@ -42,7 +42,6 @@ apply plugin: 'com.github.johnrengelman.shadow'
 repositories {
     mavenCentral()
     jcenter()
-    maven { url = 'http://dl.bintray.com/kotlin/kotlinx' }
     maven { url 'http://dl.bintray.com/jetbrains/spek' }
     maven { url = 'https://hub.spigotmc.org/nexus/content/groups/public/' }
 }
