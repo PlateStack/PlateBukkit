@@ -17,6 +17,8 @@
 include 'plate-api'
 include 'plate-common'
 include 'plate-api:immutable-collections'
+include 'library-loader'
 
 project(':plate-api').projectDir = file('plate-common/plate-api')
 project(':plate-api:immutable-collections').projectDir = file('plate-common/plate-api/immutable-collections')
+project(':library-loader').projectDir = file('plate-common/library-loader')
