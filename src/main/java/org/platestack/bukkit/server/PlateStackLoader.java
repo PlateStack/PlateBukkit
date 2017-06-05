@@ -38,6 +38,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.logging.Level;
 import java.util.stream.Stream;
@@ -54,6 +55,7 @@ final public class PlateStackLoader extends JavaPlugin
             final String ivyMd5 = ivyJar+".md5";
             final String ivySha1 = ivyJar+".sha1";
             final String ivyGroup = "org/apache/ivy";
+            final String ivyWebDir = ivyGroup+"/ivy/"+ivyVersion+'/';
 
             final Path dataFolder = getDataFolder().toPath();
             final Path libsFolder = dataFolder.resolve("libs");
@@ -81,9 +83,9 @@ final public class PlateStackLoader extends JavaPlugin
                     {
                         try
                         {
-                            download(new URL(repository, ivyGroup + '/' + ivyMd5), ivyMd5Local);
-                            download(new URL(repository, ivyGroup + '/' + ivySha1), ivySha1Local);
-                            download(new URL(repository, ivyGroup + '/' + ivyJar), ivyJarLocal);
+                            download(new URL(repository, ivyWebDir + ivyMd5), ivyMd5Local);
+                            download(new URL(repository, ivyWebDir + ivySha1), ivySha1Local);
+                            download(new URL(repository, ivyWebDir + ivyJar), ivyJarLocal);
                             if(check(ivyJarLocal, ivyMd5Local, ivySha1Local))
                             {
                                 success = true;
@@ -104,32 +106,48 @@ final public class PlateStackLoader extends JavaPlugin
             final URL ourUrl = getClass().getProtectionDomain().getCodeSource().getLocation();
             final URL ivyUrl = ivyJarLocal.toUri().toURL();
 
-            URLClassLoader classLoader = new URLClassLoader(new URL[]{ourUrl, ivyUrl}, null);
+            URLClassLoader classLoader = new URLClassLoader(new URL[]{
+                    ivyUrl,
+                    ourUrl,
+            }, ClassLoader.getSystemClassLoader());
+
             final Class<?> initialResolverClass = classLoader.loadClass(getClass().getPackage().getName() + ".InitialResolver");
+            if(classLoader != initialResolverClass.getClassLoader())
+                throw new IllegalStateException("The InitialResolver class was not loaded by our custom classloader which contains the ivy library! "+initialResolverClass.getClassLoader());
+
+            getLogger().info("Downloading libraries required by the PlateStack platform...");
             final Method resolveMethod = initialResolverClass.getDeclaredMethod("resolve", JavaPlugin.class, List.class);
 
             List<?> jars = (List<?>) resolveMethod.invoke(null, this,
                     Arrays.asList(
-                            "orb/platestack/api/libraries.list",
-                            "orb/platestack/common/libraries.list",
-                            "orb/platestack/bukkit/libraries.list"
+                            Objects.requireNonNull(getClass().getResourceAsStream("/org/platestack/api/libraries.list"), "api/libraries.list not found"),
+                            Objects.requireNonNull(getClass().getResourceAsStream("/org/platestack/common/libraries.list"), "common/libraries.list not found"),
+                            Objects.requireNonNull(getClass().getResourceAsStream("/org/platestack/bukkit/libraries.list"), "bukkit/libraries.list not found")
                     )
             );
 
             classLoader = new URLClassLoader(
-                    Stream.concat(Stream.of(ourUrl), jars.stream().map(it-> (File) it).map(file -> {
-                        try
-                        {
-                            return file.toURI().toURL();
-                        } catch(MalformedURLException e)
-                        {
-                            throw new RuntimeException(e);
-                        }
-                    })).toArray(URL[]::new),
-                    getClassLoader()
+                    Stream.concat(
+                            Stream.of(ourUrl),
+                            jars.stream().map(it-> (File) it).map(file -> {
+                                try
+                                {
+                                    return file.toURI().toURL();
+                                } catch(MalformedURLException e)
+                                {
+                                    throw new RuntimeException(e);
+                                }
+                            })
+                    )
+                            //.peek(file-> getLogger().info("Using: "+file))
+                            .toArray(URL[]::new),
+                    ClassLoader.getSystemClassLoader()
             );
 
             final Class<?> plateBukkitClass = classLoader.loadClass("org.platestack.bukkit.server.PlateBukkit");
+            if(classLoader != plateBukkitClass.getClassLoader())
+                throw new IllegalStateException("The PlateBukkit class was not loaded by our custom classloader which contains all the required libraries! "+initialResolverClass.getClassLoader());
+
             final Constructor<?> constructor = plateBukkitClass.getDeclaredConstructor(JavaPlugin.class);
             Object plateBukkit = constructor.newInstance(this);
 
@@ -224,6 +242,6 @@ final public class PlateStackLoader extends JavaPlugin
         return Files.lines(path).findFirst()
                 .map(String::trim).filter(line-> !line.isEmpty())
                 .map(line-> line.split(" ")[0])
-                .map(BigInteger::new);
+                .map(hash -> new BigInteger(hash, 16));
     }
 }

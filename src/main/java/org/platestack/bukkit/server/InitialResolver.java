@@ -22,7 +22,7 @@ import org.platestack.libraryloader.ivy.MavenArtifact;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Path;
+import java.io.InputStream;
 import java.text.ParseException;
 import java.util.HashSet;
 import java.util.List;
@@ -33,15 +33,32 @@ public final class InitialResolver
     private InitialResolver()
     {}
 
-    public static List<File> resolve(JavaPlugin plugin, List<Path> lists) throws IOException, ParseException
+    public static List<File> resolve(JavaPlugin plugin, List<InputStream> lists) throws IOException, ParseException
     {
-        final Set<MavenArtifact> dependencies = new HashSet<>();
-        for (Path listPath : lists)
-            dependencies.addAll(LibraryResolver.readArtifacts(listPath));
+        try
+        {
+            LibraryResolver.setUserDir(new File(plugin.getDataFolder(), "libs").getAbsoluteFile());
+            final Set<MavenArtifact> dependencies = new HashSet<>();
+            for (InputStream listPath : lists)
+                dependencies.addAll(LibraryResolver.readArtifacts(listPath));
 
-        return LibraryResolver.getInstance().resolve(
-                new MavenArtifact("org.platestack", "plate-bukkit", plugin.getDescription().getVersion()),
-                dependencies
-        );
+            return LibraryResolver.getInstance().resolve(
+                    new MavenArtifact("org.platestack", "plate-bukkit", plugin.getDescription().getVersion()),
+                    dependencies
+            );
+        }
+        finally
+        {
+            lists.forEach(in-> {
+                try
+                {
+                    in.close();
+                }
+                catch(Exception e)
+                {
+                    e.printStackTrace();
+                }
+            });
+        }
     }
 }

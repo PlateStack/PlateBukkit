@@ -36,6 +36,7 @@ import org.platestack.bukkit.plugin.BukkitNamespace
 import org.platestack.common.plugin.loader.CommonLoader
 import org.platestack.libraryloader.ivy.LibraryResolver
 import org.platestack.structure.immutable.immutableSetOf
+import java.io.File
 import java.nio.file.Paths
 
 class PlateBukkit(private val actualPlugin: JavaPlugin): PlateServer, org.bukkit.plugin.Plugin by actualPlugin {
@@ -45,13 +46,14 @@ class PlateBukkit(private val actualPlugin: JavaPlugin): PlateServer, org.bukkit
 
     override fun onEnable() {
         logger.info("PlateBukkit has been loaded successfully, setting up PlateStack...")
+        LibraryResolver.setUserDir(File(dataFolder, "libs").absoluteFile)
 
         val loader = CommonLoader(KotlinLogging.logger("PlateStack"))
         PlateStack = this
         PlateNamespace.loader = loader
         translator = BukkitTranslator()
-        Minecraft.server = object : MinecraftServer {
-            override val version = Version.parse(Bukkit.getVersion())
+        Minecraft = object : MinecraftServer {
+            override val version = Version.parse(Bukkit.getBukkitVersion())
         }
 
         loader.setAPI(PlateMetadata(
@@ -60,7 +62,7 @@ class PlateBukkit(private val actualPlugin: JavaPlugin): PlateServer, org.bukkit
                 Version(0,1,0,"SNAPSHOT"),
                 "1.8",
                 immutableSetOf(),
-                LibraryResolver.readArtifacts(PlateServer::class.java.getResourceAsStream("libraries.list")).map {
+                LibraryResolver.readArtifacts(PlateServer::class.java.getResourceAsStream("/org/platestack/api/libraries.list")).map {
                     MavenArtifact(it.group, it.artifact, it.version)
                 }
         ))
