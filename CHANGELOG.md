@@ -6,7 +6,6 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 ### Implements
-- BukkitNamespace
-- PlateStack Server
+- Minimal requirements to load PlateStack plugins
 
 [Unreleased]: https://github.com/PlateStack/PlateBukkit/compare/v0.0.0...HEAD
