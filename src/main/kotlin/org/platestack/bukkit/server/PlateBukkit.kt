@@ -68,7 +68,7 @@ class PlateBukkit(private val actualPlugin: JavaPlugin): PlateServer, org.bukkit
         logger.info("Scanning plate plugins...")
 
         val plugins = loader.findPlugins(Paths.get("platestack"), true) {
-            it.fileName.toString().let { it.endsWith(".jar", true) || it.endsWith(".plate", true) }
+            it.fileName.toString().let { it.endsWith(".jar", true) || it.endsWith(".plate", true) || it.endsWith(".car", true) }
         }.onEach {
             logger.info("Found: $it")
         }.map { it.toUri().toURL() }.toSet()
