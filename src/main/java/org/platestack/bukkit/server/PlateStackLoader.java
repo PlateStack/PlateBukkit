@@ -309,6 +309,11 @@ final public class PlateStackLoader extends JavaPlugin
             {
                 getLogger().log(Level.SEVERE, "Failed to load PlateStack. Shutting down!", e);
             }
+            catch(Throwable e2)
+            {
+                e.addSuppressed(e2);
+                e.printStackTrace();
+            }
             finally
             {
                 Bukkit.shutdown();

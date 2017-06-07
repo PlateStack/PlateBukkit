@@ -23,14 +23,14 @@ class Mappings {
 
     fun <T> Map<T,T>.inverse() = map { it.value to it.key }
 
-    fun inverse() = Mappings().let {
+    fun inverse() = Mappings().also {
         it.classes += classes.inverse()
         it.methods += methods.inverse()
         it.fields += fields.inverse()
     }
 
-    operator fun times(mappings: Mappings) = Mappings().let {
-        fun <T> Map<T,T>.bridge(map: Map<T,T>) = mapValues { map[it.key] ?: it.value }
+    operator fun times(mappings: Mappings) = Mappings().also {
+        fun <T> Map<T,T>.bridge(map: Map<T,T>) = mapValues { map[it.value] ?: it.value }
         it.classes += classes.bridge(mappings.classes)
         it.methods += methods.bridge(mappings.methods)
         it.fields += fields.bridge(mappings.fields)

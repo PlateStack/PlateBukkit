@@ -26,10 +26,6 @@ import java.lang.reflect.Modifier
 interface StreamScanner : Scanner {
     val knownClasses: MutableMap<ClassIdentifier, ClassStructure>
 
-    fun supplyClassChange(identifier: ClassIdentifier): ClassChange {
-        return supplyClass(identifier)?.`class` ?: throw ClassNotFoundException(identifier.fullName)
-    }
-
     fun supplyClass(identifier: ClassIdentifier, input: InputStream): ClassStructure {
         val visitor = object : ClassVisitor(Opcodes.ASM5) {
             lateinit var structure: ClassStructure
@@ -95,6 +91,10 @@ open class ClassLoaderResourceScanner(val classLoader: ClassLoader): StreamScann
 }
 
 interface Scanner {
+    fun supplyClassChange(identifier: ClassIdentifier): ClassChange {
+        return supplyClass(identifier)?.`class` ?: throw ClassNotFoundException(identifier.fullName)
+    }
+
     fun supplyClass(identifier: ClassIdentifier): ClassStructure? = null
     fun supplyField(classStructure: ClassStructure, identifier: FieldIdentifier): FieldStructure? = null
     fun supplyMethod(classStructure: ClassStructure, identifier: MethodIdentifier): MethodStructure? = null
@@ -289,41 +289,26 @@ data class MethodIdentifier(val name: String, val signature: String) {
     override fun toString() = "$name $signature"
 }
 
-data class PackageIdentifier(val parent: PackageIdentifier?, val name: String) {
-    constructor(parentName: String, name: String): this(if(parentName.isEmpty()) null else PackageIdentifier(parentName+'/'), name)
-    constructor(fullName: String): this(StringBuilder(fullName))
-    private constructor(b: StringBuilder): this(
-            b.let {
-                check(b.last() == '/') {"$b does not ends with '/'"}
-                b.deleteCharAt(b.length-1)
-                val index = b.lastIndexOf("/")
-                if(index == -1)
-                    ""
-                else {
-                    val parent = b.substring(0, index)
-                    b.delete(0, index+1)
-                    parent
-                }
-            },
-            b.append('/').toString()
-    )
+data class PackageIdentifier constructor(val parent: PackageIdentifier?, val name: String) {
+    constructor(parentName: String, name: String): this(if(parentName.isBlank()) null else PackageIdentifier(parentName), name)
+    constructor(fullName: String): this(fullName.substringBeforeLast('/', ""), fullName.substringAfterLast('/'))
 
     init {
-        check(name.isNotBlank()) { "Package name is blank" }
-        check(name != "/") { "Package can't be named '/' : $this" }
-        check(name.endsWith('/')) { "Package name does not ends with '/': $this " }
-        check('/' !in name.substring(0, name.length-1)) { "Package name contains '/' in the middle of the name '$name' : $this" }
+        check(name.isNotBlank() || parent == null) { "Package name is blank but has a parent! : $this" }
+        check('/' !in name) { "Package can't contains '/' : $this" }
+        check('.' !in name) { "Package can't contains '.' : $this" }
     }
 
-    val fullName = (parent?.let { "$it" } ?: "") + name
-    override fun toString() = fullName
+    val fullName = if(parent != null) "$parent$name" else name
+    val prefix = if(name.isBlank()) "" else "$fullName/"
+    override fun toString() = prefix
 }
 
 data class ClassIdentifier(val `package`: PackageIdentifier, val className: String) {
-    constructor(packageName: String, className: String): this(PackageIdentifier(packageName+'/'), className)
+    constructor(packageName: String, className: String): this(PackageIdentifier(packageName), className)
     constructor(fullName: String): this(fullName.substringBeforeLast('/', ""), fullName.substringAfterLast('/'))
 
-    val fullName = "$`package`$className"
+    val fullName = `package`.prefix + className
     override fun toString() = fullName
 }
 
@@ -352,9 +337,18 @@ data class MethodChange(val name: Name, val signatureType: MethodSignature) {
 data class PackageChange(val name: Name) {
     val from = PackageIdentifier(name.current)
     val to get() = PackageIdentifier(name.reverse)
+
+    init {
+        check(!name.current.endsWith('/')) { "Package name can't end with '/'" }
+        checkReverse()
+    }
+
+    fun checkReverse() {
+        check(!name.reverse.endsWith('/')) { "Package name can't end with '/'" }
+    }
 }
 
-data class ClassChange(val `package`: PackageChange, val name: Name) {
+data class ClassChange(val `package`: PackageChange, val name: Name): Cloneable {
     val from = ClassIdentifier(`package`.from, name.current)
     val to get() = ClassIdentifier(`package`.to, name.reverse)
 
@@ -362,6 +356,7 @@ data class ClassChange(val `package`: PackageChange, val name: Name) {
         mappings.classes[from]?.also { new ->
             name.reverse = new.className
             `package`.name.reverse = new.`package`.fullName
+            `package`.checkReverse()
         }
     }
 }

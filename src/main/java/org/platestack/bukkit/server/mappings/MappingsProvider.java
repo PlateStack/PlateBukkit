@@ -18,9 +18,12 @@ package org.platestack.bukkit.server.mappings;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.io.IOException;
+
 @FunctionalInterface
 public interface MappingsProvider
 {
     @NotNull
-    Mappings invoke(@NotNull String minecraftVersion, @NotNull String bukkitVersion, @NotNull String packageVersion);
+    Mappings invoke(@NotNull String minecraftVersion, @NotNull String bukkitVersion, @NotNull String packageVersion)
+            throws IOException;
 }
