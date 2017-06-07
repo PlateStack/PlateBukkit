@@ -21,17 +21,19 @@ import org.objectweb.asm.ClassReader
 import org.objectweb.asm.ClassWriter
 import org.objectweb.asm.commons.ClassRemapper
 import org.platestack.api.server.UniqueModification
+import org.platestack.api.structure.ReflectionTarget
+import org.platestack.bukkit.server.PlateStackLoader
 import org.platestack.common.plugin.loader.Transformer
 import java.io.File
 import java.io.InputStream
 import java.util.logging.Logger
 
+@ReflectionTarget(PlateStackLoader::class)
 object BukkitTransformer: Transformer {
     var mappingProvider = MappingsProvider { _, _, _ -> Mappings() }
 
     private lateinit var classLoader: ClassLoader
     private var logger by UniqueModification<Logger>()
-    private val bukkitScanner by lazy { ClassLoaderResourceScanner(classLoader) }
     private val env by lazy {
         logger.info("Computing the mappings: SRG -> Notch -> CraftBukkit")
         val minecraftVersion = Bukkit.getVersion().split("(MC:", ")")[1].trim()
@@ -40,23 +42,23 @@ object BukkitTransformer: Transformer {
         logger.info("Minecraft: $minecraftVersion Bukkit: $bukkitVersion Package: $packageVersion")
         //TODO remove this line
         mappingProvider = URLMappingsProvider(File("D:\\_InteliJ\\org.platestack\\Mappings").toURI().toURL())
-        ClassRemapEnvironment(extendedScanner).apply {
+        ClassRemapEnvironment(scanner).apply {
             apply(mappingProvider(minecraftVersion, bukkitVersion, packageVersion))
         }
     }
 
     private var sourceClassLoader: ClassLoader? = null
 
-    private val extendedScanner by lazy { object : Scanner by bukkitScanner {
+    private val scanner by lazy { object : ClassLoaderResourceScanner(classLoader) {
         override fun supplyClass(identifier: ClassIdentifier): ClassStructure? {
             try {
-                return bukkitScanner.supplyClass(identifier)
+                return super.supplyClass(identifier)
             }
             catch (e: ClassNotFoundException) {
                 sourceClassLoader?.let {
                     try {
                         it.getResourceAsStream(identifier.fullName+".class")?.use { input ->
-                            return bukkitScanner.supplyClass(identifier, input)
+                            return supplyClass(identifier, input)
                         }
 
                         throw ClassNotFoundException(identifier.fullName)
@@ -70,6 +72,7 @@ object BukkitTransformer: Transformer {
         }
     } }
 
+    @ReflectionTarget(PlateStackLoader::class)
     fun initialize(classLoader: ClassLoader, logger: Logger) {
         this.classLoader = classLoader
         this.logger = logger

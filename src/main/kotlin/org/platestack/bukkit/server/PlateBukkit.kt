@@ -31,6 +31,7 @@ import org.platestack.api.server.PlateServer
 import org.platestack.api.server.PlateStack
 import org.platestack.api.server.PlatformNamespace
 import org.platestack.api.server.internal.InternalAccessor
+import org.platestack.api.structure.ReflectionTarget
 import org.platestack.bukkit.message.BukkitTranslator
 import org.platestack.bukkit.plugin.BukkitNamespace
 import org.platestack.common.plugin.loader.CommonLoader
@@ -40,11 +41,14 @@ import org.platestack.structure.immutable.immutableSetOf
 import java.io.File
 import java.nio.file.Paths
 
-class PlateBukkit(private val actualPlugin: JavaPlugin, private val transformer: Transformer): PlateServer, org.bukkit.plugin.Plugin by actualPlugin {
+class PlateBukkit @ReflectionTarget(PlateStackLoader::class) constructor(
+        private val actualPlugin: JavaPlugin, private val transformer: Transformer
+) : PlateServer, org.bukkit.plugin.Plugin by actualPlugin {
     override val platformName: String get() = "bukkit"
     override val platform = PlatformNamespace("bukkit" to Version.parse(Bukkit.getBukkitVersion()))
     override lateinit var translator: BukkitTranslator
 
+    @ReflectionTarget(PlateStackLoader::class)
     override fun onEnable() {
         logger.info("PlateBukkit has been loaded successfully, setting up PlateStack...")
         LibraryResolver.setUserDir(File(dataFolder, "libs").absoluteFile)

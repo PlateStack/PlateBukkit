@@ -23,14 +23,14 @@ import java.lang.reflect.Modifier
 
 // Scanners
 
-abstract class StreamScanner : Scanner {
-    val knownClasses = HashMap<ClassIdentifier, ClassStructure>()
+interface StreamScanner : Scanner {
+    val knownClasses: MutableMap<ClassIdentifier, ClassStructure>
 
     fun supplyClassChange(identifier: ClassIdentifier): ClassChange {
         return supplyClass(identifier)?.`class` ?: throw ClassNotFoundException(identifier.fullName)
     }
 
-    open fun supplyClass(identifier: ClassIdentifier, input: InputStream): ClassStructure {
+    fun supplyClass(identifier: ClassIdentifier, input: InputStream): ClassStructure {
         val visitor = object : ClassVisitor(Opcodes.ASM5) {
             lateinit var structure: ClassStructure
             override fun visit(version: Int, access: Int, name: String?, signature: String?, superName: String?, interfaces: Array<out String>?) {
@@ -80,7 +80,9 @@ abstract class StreamScanner : Scanner {
     }
 }
 
-class ClassLoaderResourceScanner(val classLoader: ClassLoader): StreamScanner() {
+open class ClassLoaderResourceScanner(val classLoader: ClassLoader): StreamScanner {
+    override val knownClasses = HashMap<ClassIdentifier, ClassStructure>()
+
     override fun supplyClass(identifier: ClassIdentifier): ClassStructure? {
         knownClasses[identifier]?.let { return it }
 
