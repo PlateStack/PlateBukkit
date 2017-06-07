@@ -19,12 +19,14 @@ package org.platestack.bukkit.server;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.math.BigInteger;
+import java.net.JarURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -34,13 +36,14 @@ import java.nio.channels.ReadableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.security.CodeSource;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.security.ProtectionDomain;
+import java.security.cert.Certificate;
+import java.util.*;
 import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Stream;
 
 final public class PlateStackLoader extends JavaPlugin
@@ -94,7 +97,6 @@ final public class PlateStackLoader extends JavaPlugin
                         }
                         catch(IOException ignored)
                         {
-                            continue;
                         }
                     }
                 }
@@ -106,7 +108,7 @@ final public class PlateStackLoader extends JavaPlugin
             final URL ourUrl = getClass().getProtectionDomain().getCodeSource().getLocation();
             final URL ivyUrl = ivyJarLocal.toUri().toURL();
 
-            URLClassLoader classLoader = new URLClassLoader(new URL[]{
+            ClassLoader classLoader = new URLClassLoader(new URL[]{
                     ivyUrl,
                     ourUrl,
             }, ClassLoader.getSystemClassLoader());
@@ -118,7 +120,7 @@ final public class PlateStackLoader extends JavaPlugin
             getLogger().info("Downloading libraries required by the PlateStack platform...");
             final Method resolveMethod = initialResolverClass.getDeclaredMethod("resolve", JavaPlugin.class, List.class);
 
-            List<?> jars = (List<?>) resolveMethod.invoke(null, this,
+            final List<?> jars = (List<?>) resolveMethod.invoke(null, this,
                     Arrays.asList(
                             Objects.requireNonNull(getClass().getResourceAsStream("/org/platestack/api/libraries.list"), "api/libraries.list not found"),
                             Objects.requireNonNull(getClass().getResourceAsStream("/org/platestack/common/libraries.list"), "common/libraries.list not found"),
@@ -144,14 +146,161 @@ final public class PlateStackLoader extends JavaPlugin
                     ClassLoader.getSystemClassLoader()
             );
 
+            final ClassLoader[] classLoaders = {classLoader, getClassLoader()};
+
+            classLoader = new ClassLoader(ClassLoader.getSystemClassLoader()) {
+                @Override
+                protected Enumeration<URL> findResources(String name) throws IOException
+                {
+                    final List<Enumeration<URL>> total = new ArrayList<>(classLoaders.length);
+                    for (ClassLoader loader : classLoaders)
+                    {
+                        Enumeration<URL> resources = loader.getResources(name);
+                        if(resources.hasMoreElements())
+                            total.add(resources);
+                    }
+
+                    if(total.isEmpty())
+                        return new Enumeration<URL>()
+                        {
+                            @Override
+                            public boolean hasMoreElements()
+                            {
+                                return false;
+                            }
+
+                            @Override
+                            public URL nextElement()
+                            {
+                                throw new NoSuchElementException();
+                            }
+                        };
+
+                    if(total.size() == 1)
+                        return total.get(0);
+
+                    return new Enumeration<URL>()
+                    {
+                        private Queue<Enumeration<URL>> queue = new ArrayDeque<>(total);
+
+                        @Override
+                        public boolean hasMoreElements()
+                        {
+                            return !queue.isEmpty();
+                        }
+
+                        @Override
+                        public URL nextElement()
+                        {
+                            Enumeration<URL> iter = queue.peek();
+                            URL next = iter.nextElement();
+                            if(!iter.hasMoreElements())
+                                queue.remove();
+                            return next;
+                        }
+                    };
+                }
+
+                @Override
+                protected URL findResource(String name)
+                {
+                    for (ClassLoader loader : classLoaders)
+                    {
+                        final URL resource = loader.getResource(name);
+                        if(resource != null)
+                            return resource;
+                    }
+
+                    return null;
+                }
+
+
+                @Override
+                protected Class<?> findClass(String name) throws ClassNotFoundException
+                {
+                    ClassNotFoundException exception = null;
+                    for (ClassLoader loader : classLoaders)
+                    {
+                        final URL resource = loader.getResource(name.replace('.', '/') + ".class");
+                        if(resource != null)
+                        {
+                            final byte[] classData;
+                            try(InputStream input = resource.openStream())
+                            {
+                                final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+                                int nRead;
+                                final byte[] data = new byte[16384];
+
+                                while ((nRead = input.read(data, 0, data.length)) != -1) {
+                                    buffer.write(data, 0, nRead);
+                                }
+
+                                buffer.flush();
+                                classData = buffer.toByteArray();
+                            }
+                            catch(IOException e)
+                            {
+                                e.printStackTrace();
+                                continue;
+                            }
+
+                            URL source;
+                            try
+                            {
+                                final JarURLConnection connection =
+                                        (JarURLConnection) resource.openConnection();
+                                source = connection.getJarFileURL();
+                            }
+                            catch(Exception e)
+                            {
+                                source = resource;
+                            }
+
+                            ProtectionDomain protectionDomain = new ProtectionDomain(new CodeSource(source, (Certificate[]) null), null);
+                            return defineClass(name, classData, 0, classData.length, protectionDomain);
+                        }
+                        try
+                        {
+                            return loader.loadClass(name);
+                        }
+                        catch(ClassNotFoundException e)
+                        {
+                            if(exception == null)
+                                exception = new ClassNotFoundException(name);
+                            exception.addSuppressed(e);
+                        }
+                    }
+
+                    if(exception != null)
+                        throw exception;
+                    throw new ClassNotFoundException(name);
+                }
+            };
+
             final Class<?> plateBukkitClass = classLoader.loadClass("org.platestack.bukkit.server.PlateBukkit");
             if(classLoader != plateBukkitClass.getClassLoader())
                 throw new IllegalStateException("The PlateBukkit class was not loaded by our custom classloader which contains all the required libraries! "+initialResolverClass.getClassLoader());
 
-            final Constructor<?> constructor = plateBukkitClass.getDeclaredConstructor(JavaPlugin.class);
-            Object plateBukkit = constructor.newInstance(this);
+            final Class<?> transformerClass = classLoader.loadClass("org.platestack.bukkit.server.mappings.BukkitTransformer");
+            if(classLoader != plateBukkitClass.getClassLoader())
+                throw new IllegalStateException("The BukkitTransformer object was not loaded by our custom classloader which contains all the required libraries! "+initialResolverClass.getClassLoader());
 
-            Method onEnableMethod = plateBukkitClass.getMethod("onEnable");
+            final Class<?> kotlin = classLoader.loadClass("kotlin.jvm.JvmClassMappingKt");
+            final Object transformerKClass = kotlin.getDeclaredMethod("getKotlinClass", Class.class).invoke(null, transformerClass);
+
+            final Class<?> transformerInterface = classLoader.loadClass("org.platestack.common.plugin.loader.Transformer");
+
+            final Object transformer = transformerInterface.cast(
+                transformerKClass.getClass().getMethod("getObjectInstance").invoke(transformerKClass)
+            );
+
+            transformerClass.getDeclaredMethod("initialize", ClassLoader.class, Logger.class)
+                    .invoke(transformer, classLoader, getLogger());
+
+            final Constructor<?> constructor = plateBukkitClass.getDeclaredConstructor(JavaPlugin.class, transformerInterface);
+            final Object plateBukkit = constructor.newInstance(this, transformer);
+
+            final Method onEnableMethod = plateBukkitClass.getMethod("onEnable");
             onEnableMethod.invoke(plateBukkit);
         }
         catch(Throwable e)

@@ -20,6 +20,7 @@ import com.google.gson.JsonObject
 import mu.KotlinLogging
 import org.bukkit.Bukkit
 import org.bukkit.plugin.java.JavaPlugin
+import org.objectweb.asm.*
 import org.platestack.api.message.Text
 import org.platestack.api.minecraft.Minecraft
 import org.platestack.api.minecraft.MinecraftServer
@@ -34,12 +35,13 @@ import org.platestack.api.server.internal.InternalAccessor
 import org.platestack.bukkit.message.BukkitTranslator
 import org.platestack.bukkit.plugin.BukkitNamespace
 import org.platestack.common.plugin.loader.CommonLoader
+import org.platestack.common.plugin.loader.Transformer
 import org.platestack.libraryloader.ivy.LibraryResolver
 import org.platestack.structure.immutable.immutableSetOf
 import java.io.File
 import java.nio.file.Paths
 
-class PlateBukkit(private val actualPlugin: JavaPlugin): PlateServer, org.bukkit.plugin.Plugin by actualPlugin {
+class PlateBukkit(private val actualPlugin: JavaPlugin, private val transformer: Transformer): PlateServer, org.bukkit.plugin.Plugin by actualPlugin {
     override val platformName: String get() = "bukkit"
     override val platform = PlatformNamespace("bukkit" to Version.parse(Bukkit.getBukkitVersion()))
     override lateinit var translator: BukkitTranslator
@@ -48,7 +50,30 @@ class PlateBukkit(private val actualPlugin: JavaPlugin): PlateServer, org.bukkit
         logger.info("PlateBukkit has been loaded successfully, setting up PlateStack...")
         LibraryResolver.setUserDir(File(dataFolder, "libs").absoluteFile)
 
-        val loader = CommonLoader(KotlinLogging.logger("PlateStack"))
+        val loader = CommonLoader(KotlinLogging.logger("PlateStack"), javaClass.classLoader, /* transformer) */ Transformer { _, _, input ->
+            val reader = ClassReader(input)
+            val writer = ClassWriter(reader, ClassWriter.COMPUTE_FRAMES)
+            val visitor = object : ClassVisitor(Opcodes.ASM5, writer) {
+                override fun visitMethod(access: Int, methodName: String, desc: String, signature: String?, exceptions: Array<out String>?): MethodVisitor? {
+                    if (methodName == "onEnable") {
+                        return object : MethodVisitor(Opcodes.ASM5, super.visitMethod(access, methodName, desc, signature, exceptions)) {
+                            override fun visitLdcInsn(cst: Any) {
+                                if (cst is String) {
+                                    super.visitLdcInsn(cst + " YOU HAVE BEEN HACKED BY BUKKIT!!! HAHA")
+                                } else {
+                                    super.visitLdcInsn(cst)
+                                }
+                            }
+                        }
+                    } else
+                        return super.visitMethod(access, methodName, desc, signature, exceptions)
+                }
+            }
+
+            reader.accept(visitor, 0)
+            writer.toByteArray()
+        })
+
         PlateStack = this
         PlateNamespace.loader = loader
         translator = BukkitTranslator()

@@ -48,6 +48,8 @@ repositories {
 
 dependencies {
     compile project(':plate-common')
+    compile 'org.ow2.asm:asm-tree:5.2'
+    compile 'org.ow2.asm:asm-commons:5.2'
     compile 'org.bukkit:bukkit:1.12-pre5-SNAPSHOT'
     compile 'org.slf4j:slf4j-simple:1.7.25'
     compile 'org.eclipse.jgit:org.eclipse.jgit:4.7.0.201704051617-r'
