@@ -29,10 +29,26 @@ class Mappings {
         it.fields += fields.inverse()
     }
 
+    operator fun rem(mappings: Mappings) = times(mappings).also {
+        //val restored = it.classes.asSequence().filterNot { it.value in mappings.classes }.associate { it.key to (classes[it.key] ?: it.value) }
+        //it.classes += restored
+    }
+
     operator fun times(mappings: Mappings) = Mappings().also {
         fun <T> Map<T,T>.bridge(map: Map<T,T>) = mapValues { map[it.value] ?: it.value }
         it.classes += classes.bridge(mappings.classes)
         it.methods += methods.bridge(mappings.methods)
         it.fields += fields.bridge(mappings.fields)
+    }
+
+    operator fun plusAssign(mappings: Mappings) {
+        classes += mappings.classes
+        methods += mappings.methods
+        fields += mappings.fields
+    }
+
+    operator fun plus(mappings: Mappings) = Mappings().also {
+        it += this
+        it += mappings
     }
 }

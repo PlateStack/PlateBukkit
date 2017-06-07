@@ -16,6 +16,8 @@
 
 package org.platestack.bukkit.server.mappings
 
+import java.util.stream.Stream
+
 typealias ClassToken = ClassIdentifier
 typealias ClassMapping = HashMap<ClassToken, ClassToken>
 
@@ -24,3 +26,5 @@ typealias MethodMapping = HashMap<MethodToken, MethodToken>
 
 typealias FieldToken = Pair<ClassIdentifier, FieldIdentifier>
 typealias FieldMapping = HashMap<FieldToken, FieldToken>
+
+fun Stream<String>.filterComments() = map(String::trim).filter(String::isNotBlank).filter { !it.startsWith('#') }!!

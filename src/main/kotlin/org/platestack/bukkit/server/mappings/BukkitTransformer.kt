@@ -41,7 +41,12 @@ object BukkitTransformer: Transformer {
         val packageVersion = Bukkit.getServer().javaClass.`package`.name.substringAfterLast('.')
         logger.info("Minecraft: $minecraftVersion Bukkit: $bukkitVersion Package: $packageVersion")
         //TODO remove this line
-        mappingProvider = BukkitURLMappingsProvider(File("D:\\_InteliJ\\org.platestack\\Mappings").toURI().toURL(), scanner, logger)
+        val repository = File("D:\\_InteliJ\\org.platestack\\Mappings").toURI().toURL()
+        val bukkitMappings = BukkitURLMappingsProvider(repository, scanner, logger)
+        val srgMappings = Srg2NotchURLMappingsProvider(repository, logger)
+        mappingProvider = MappingsProvider { a,b,c ->
+            srgMappings(a,b,c) % bukkitMappings(a,b,c)
+        }
         ClassRemapEnvironment(scanner).apply {
             apply(mappingProvider(minecraftVersion, bukkitVersion, packageVersion))
         }

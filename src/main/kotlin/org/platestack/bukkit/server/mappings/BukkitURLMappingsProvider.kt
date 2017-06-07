@@ -21,14 +21,12 @@ import java.io.InputStream
 import java.io.InputStreamReader
 import java.net.URL
 import java.util.logging.Logger
-import java.util.stream.Stream
 import kotlin.streams.asSequence
 import kotlin.streams.toList
 
 class BukkitURLMappingsProvider(val base: URL, val scanner: Scanner, val logger: Logger, val checkPackageVersion: Boolean = true) : MappingsProvider {
     fun InputStream.lines(charset: String = "UTF-8") = BufferedReader(InputStreamReader(this, charset)).lines()!!
     fun InputStream.readLine(charset: String = "UTF-8") = BufferedReader(InputStreamReader(this, charset)).readLine()!!
-    fun Stream<String>.filterComments() = map(String::trim).filter(String::isNotBlank).filter { !it.startsWith('#') }!!
 
     override fun invoke(minecraftVersion: String, bukkitVersion: String, packageVersion: String): Mappings {
         logger.info { "Checking remote bukkit package version. Expecting: $packageVersion" }
