@@ -114,36 +114,19 @@ class BukkitURLMappingsProvider(val base: URL, val scanner: Scanner, val logger:
             }
         }.asSequence().mapNotNull { (className, fromFieldName, toFieldName) ->
             val line = "$className $fromFieldName $toFieldName"
-            val classId = ClassIdentifier(className).let { remapOrRegisterNoPackage(it) /*fromNoPackage.classes[it] ?: it.let {
-                val from = it
-                val to = ClassIdentifier(className.replace("net/minecraft/server/", "net/minecraft/server/$packageVersion/"))
-                logger.warning("Found omitted class: $it , remmaping to: $to")
-                mappings.classes[from] = to
-                inverse.classes[to] = from
-                fromNoPackage.classes[from] = to
-                to
-            } */ }
+            val classId = remapOrRegisterNoPackage(ClassIdentifier(className))
+
+            // Technically, we don't need to verify the class anymore since the field signature have been dropped from the identifier
             val classStructure = scanner.supplyClass(classId) ?: error("The structure scanned couldn't find $classId to map $line")
             val targetField = classStructure.fields.keys.find { it.name == toFieldName }
                     ?: "Field $toFieldName not found while mapping $line".let { logger.severe(it); return@mapNotNull null }
-            val from = FieldIdentifier(fromFieldName,
-                    SignatureType(targetField.signature) {
-                        scanner.supplyClass(it)?.`class` ?: error("No class found to remap the signature of $targetField . Mapping: $line")
-                    }.isolated().run {
-                        apply(inverse)
-                        to
-                    })
+            val from = FieldIdentifier(fromFieldName)
 
             (inverse.classes[classId]!! to from) to (classId to targetField)
-            //classId to (from to targetField)
-            //.groupingBy { it.first }.fold(HashMap<FieldIdentifier, FieldIdentifier>()) { m, (_,f) -> m[f.first] = f.second; m }
         }.toMap().let {
             logger.info { "Loaded ${it.size} field name mappings" }
             mappings.fields += it
         }
-
-        // NiceName -> aaaa
-        //val inverseFromNoPackage = fromNoPackage * inverse
 
         methodList.associate { (className, fromMethodName, noPackageSignature, toMethodName) ->
             val line = "$className $fromMethodName $noPackageSignature $toMethodName"
@@ -151,8 +134,6 @@ class BukkitURLMappingsProvider(val base: URL, val scanner: Scanner, val logger:
             val methodSignature = MethodSignature(noPackageSignature) {
                 scanner.supplyClass(
                         remapOrRegisterNoPackage(it)
-                        //fromNoPackage.classes[it]
-                        //        ?: error("Unknown class $it")
                 )?.`class` ?: error("No class found to remap the signature of $className$noPackageSignature . Mapping: $line")
             }
 

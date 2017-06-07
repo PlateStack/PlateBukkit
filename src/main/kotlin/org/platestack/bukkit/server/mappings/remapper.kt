@@ -39,17 +39,15 @@ interface StreamScanner : Scanner {
             }
 
             override fun visitField(access: Int, name: String, desc: String, signature: String?, value: Any?): FieldVisitor? {
-                val field = FieldIdentifier(name, desc)
+                val field = FieldIdentifier(name)
                 val superStructure = structure.find(field)
                 structure.fields[field] =
-                        superStructure?.let { FieldStructure(superStructure.field, it.owner, AccessLevel[access]) }
+                        superStructure?.let { FieldStructure(superStructure.field, it.owner, AccessLevel[access], SignatureType(desc) { supplyClassChange(it) }) }
                                 ?: FieldStructure(
-                                FieldChange(
-                                        Name(field.name),
-                                        SignatureType(field.signature) { supplyClassChange(it) }
-                                ),
-                                structure.`class`, AccessLevel[access]
-                        )
+                                        FieldChange(Name(field.name)),
+                                        structure.`class`, AccessLevel[access],
+                                        SignatureType(desc) { supplyClassChange(it) }
+                                )
 
                 return null
             }
@@ -140,7 +138,7 @@ class ClassRemapEnvironment(
 
     override fun mapFieldName(owner: String, name: String, desc: String): String {
         val classStructure = get(owner) ?: return name
-        val identifier = FieldIdentifier(name, desc)
+        val identifier = FieldIdentifier(name)
         val fieldStructure = classStructure.find(identifier) ?: fieldBuilder?.invoke(classStructure, identifier)?.also {
             classStructure.fields[it.field.from] = it
             it.apply(mappings)
@@ -195,9 +193,9 @@ data class MethodStructure(val method: MethodChange, override val owner: ClassCh
     }
 }
 
-data class FieldStructure(val field: FieldChange, override val owner: ClassChange, override var access: AccessLevel) : ClassScoped {
+data class FieldStructure(val field: FieldChange, override val owner: ClassChange, override var access: AccessLevel, val signature: SignatureType) : ClassScoped {
     fun apply(mappings: Mappings) {
-        field.apply(mappings, mappings.fields[owner.from to field.from]?.also {
+        field.apply(mappings.fields[owner.from to field.from]?.also {
             owner.name.reverse = it.first.className
             owner.`package`.name.reverse = it.first.`package`.fullName
         })
@@ -281,8 +279,8 @@ data class MethodSignature(val returnType: SignatureType, val parameterTypes: Li
 
 // Identifiers
 
-data class FieldIdentifier(val name: String, val signature: String) {
-    override fun toString() = "$name $signature"
+data class FieldIdentifier(val name: String) {
+    override fun toString() = name
 }
 
 data class MethodIdentifier(val name: String, val signature: String) {
@@ -314,12 +312,11 @@ data class ClassIdentifier(val `package`: PackageIdentifier, val className: Stri
 
 // Named
 
-data class FieldChange(val name: Name, val type: SignatureType) {
-    val from = FieldIdentifier(name.current, type.from)
-    val to get() = FieldIdentifier(name.reverse, type.to)
+data class FieldChange(val name: Name) {
+    val from = FieldIdentifier(name.current)
+    val to get() = FieldIdentifier(name.reverse)
 
-    fun apply(mappings: Mappings, new: FieldToken?) {
-        type.apply(mappings)
+    fun apply(new: FieldToken?) {
         new?.let { name.reverse = new.second.name }
     }
 }
@@ -348,7 +345,7 @@ data class PackageChange(val name: Name) {
     }
 }
 
-data class ClassChange(val `package`: PackageChange, val name: Name): Cloneable {
+data class ClassChange(val `package`: PackageChange, val name: Name) {
     val from = ClassIdentifier(`package`.from, name.current)
     val to get() = ClassIdentifier(`package`.to, name.reverse)
 
