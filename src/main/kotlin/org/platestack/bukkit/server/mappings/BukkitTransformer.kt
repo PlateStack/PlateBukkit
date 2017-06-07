@@ -22,10 +22,13 @@ import org.objectweb.asm.ClassWriter
 import org.objectweb.asm.commons.ClassRemapper
 import org.platestack.api.server.UniqueModification
 import org.platestack.common.plugin.loader.Transformer
+import java.io.File
 import java.io.InputStream
 import java.util.logging.Logger
 
-object BukkitTransformer: Transformer, Scanner {
+object BukkitTransformer: Transformer {
+    var mappingProvider = MappingsProvider { _, _, _ -> Mappings() }
+
     private lateinit var classLoader: ClassLoader
     private var logger by UniqueModification<Logger>()
     private val bukkitScanner by lazy { ClassLoaderResourceScanner(classLoader) }
@@ -35,35 +38,37 @@ object BukkitTransformer: Transformer, Scanner {
         val bukkitVersion = Bukkit.getBukkitVersion()
         val packageVersion = Bukkit.getServer().javaClass.`package`.name.substringAfterLast('.')
         logger.info("Minecraft: $minecraftVersion Bukkit: $bukkitVersion Package: $packageVersion")
-
-        ClassRemapEnvironment(this)
+        //TODO remove this line
+        mappingProvider = URLMappingsProvider(File("D:\\_InteliJ\\org.platestack\\Mappings").toURI().toURL())
+        ClassRemapEnvironment(extendedScanner).apply {
+            apply(mappingProvider(minecraftVersion, bukkitVersion, packageVersion))
+        }
     }
 
     private var sourceClassLoader: ClassLoader? = null
 
-    override fun supplyField(classStructure: ClassStructure, identifier: FieldIdentifier) = bukkitScanner.supplyField(classStructure, identifier)
-    override fun supplyMethod(classStructure: ClassStructure, identifier: MethodIdentifier) = bukkitScanner.supplyMethod(classStructure, identifier)
+    private val extendedScanner by lazy { object : Scanner by bukkitScanner {
+        override fun supplyClass(identifier: ClassIdentifier): ClassStructure? {
+            try {
+                return bukkitScanner.supplyClass(identifier)
+            }
+            catch (e: ClassNotFoundException) {
+                sourceClassLoader?.let {
+                    try {
+                        it.getResourceAsStream(identifier.fullName+".class")?.use { input ->
+                            return bukkitScanner.supplyClass(identifier, input)
+                        }
 
-    override fun supplyClass(identifier: ClassIdentifier): ClassStructure? {
-        try {
-            return bukkitScanner.supplyClass(identifier)
-        }
-        catch (e: ClassNotFoundException) {
-            sourceClassLoader?.let {
-                try {
-                    it.getResourceAsStream(identifier.fullName+".class")?.use { input ->
-                        return bukkitScanner.supplyClass(identifier, input)
+                        throw ClassNotFoundException(identifier.fullName)
                     }
-
-                    throw ClassNotFoundException(identifier.fullName)
-                }
-                catch (e2: ClassNotFoundException) {
-                    e2.addSuppressed(e)
-                    throw e2
-                }
-            } ?: throw e
+                    catch (e2: ClassNotFoundException) {
+                        e2.addSuppressed(e)
+                        throw e2
+                    }
+                } ?: throw e
+            }
         }
-    }
+    } }
 
     fun initialize(classLoader: ClassLoader, logger: Logger) {
         this.classLoader = classLoader

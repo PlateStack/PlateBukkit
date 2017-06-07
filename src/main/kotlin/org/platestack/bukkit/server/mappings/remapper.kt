@@ -103,13 +103,16 @@ interface Scanner {
 class ClassRemapEnvironment(
         val classBuilder: ((ClassIdentifier)-> ClassStructure?)?,
         val fieldBuilder: ((ClassStructure, FieldIdentifier) -> FieldStructure?)?,
-        val methodBuilder: ((ClassStructure, MethodIdentifier) -> MethodStructure?)?
+        val methodBuilder: ((ClassStructure, MethodIdentifier) -> MethodStructure?)?,
+        mappings: Mappings = Mappings()
 ) : Remapper() {
     constructor(scanner: Scanner): this(scanner::supplyClass, scanner::supplyField, scanner::supplyMethod)
     val classes = HashMap<ClassIdentifier, ClassStructure>()
+    var mappings = mappings; private set
 
     fun apply(mappings: Mappings) {
         classes.values.forEach { it.apply(mappings) }
+        this.mappings = mappings
     }
 
     private operator fun get(fromFullClassName: String) = get(ClassIdentifier(fromFullClassName))
@@ -118,6 +121,7 @@ class ClassRemapEnvironment(
         classes.computeIfAbsent(structure.`class`.from) { _ ->
             structure.`super`?.let { register(it) }
             structure.interfaces.forEach { register(it) }
+            structure.apply(mappings)
             structure
         }
     }
@@ -137,9 +141,7 @@ class ClassRemapEnvironment(
         val identifier = FieldIdentifier(name, desc)
         val fieldStructure = classStructure.find(identifier) ?: fieldBuilder?.invoke(classStructure, identifier)?.also {
             classStructure.fields[it.field.from] = it
-            //get(it.owner.from)?.apply {
-            //    fields[it.field.from] = it
-            //}
+            it.apply(mappings)
         }
 
         return fieldStructure?.field?.to?.name ?: name
@@ -150,9 +152,7 @@ class ClassRemapEnvironment(
         val identifier = MethodIdentifier(name, desc)
         val methodStructure = classStructure.find(identifier) ?: methodBuilder?.invoke(classStructure, identifier)?.also {
             classStructure.methods[it.method.from] = it
-            //get(it.owner.from)?.apply {
-            //    methods[it.method.from] = it
-            //}
+            it.apply(mappings)
         }
 
         return methodStructure?.method?.to?.name ?: name

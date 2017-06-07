@@ -16,21 +16,12 @@
 
 package org.platestack.bukkit.server.mappings
 
-typealias ClassToken = ClassIdentifier
-typealias ClassMapping = HashMap<ClassToken, ClassToken>
-
-typealias MethodToken = Pair<ClassIdentifier, MethodIdentifier>
-typealias MethodMapping = HashMap<MethodToken, MethodToken>
-
-typealias FieldToken = Pair<ClassIdentifier, FieldIdentifier>
-typealias FieldMapping = HashMap<FieldToken, FieldToken>
-
-private fun <T> Map<T,T>.inverse() = map { it.value to it.key }
-
 class Mappings {
     val classes = ClassMapping()
     val methods = MethodMapping()
     val fields = FieldMapping()
+
+    fun <T> Map<T,T>.inverse() = map { it.value to it.key }
 
     fun inverse() = Mappings().let {
         it.classes += classes.inverse()
