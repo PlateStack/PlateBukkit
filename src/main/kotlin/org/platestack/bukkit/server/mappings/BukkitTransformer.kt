@@ -28,6 +28,7 @@ import java.io.File
 import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.Paths
+import java.util.logging.Level
 import java.util.logging.Logger
 
 @ReflectionTarget(PlateStackLoader::class)
@@ -59,7 +60,7 @@ object BukkitTransformer: Transformer {
     private var sourceClassLoader: ClassLoader? = null
 
     private val scanner by lazy { object : ClassLoaderResourceScanner(classLoader) {
-        override fun supplyClass(identifier: ClassIdentifier): ClassStructure? {
+        private fun supplyClassNormally(identifier: ClassIdentifier): ClassStructure? {
             try {
                 return super.supplyClass(identifier)
             }
@@ -77,6 +78,22 @@ object BukkitTransformer: Transformer {
                         throw e2
                     }
                 } ?: throw e
+            }
+        }
+
+        override fun supplyClass(identifier: ClassIdentifier): ClassStructure? {
+            try {
+                try {
+                    return supplyClassNormally(identifier)
+                }
+                catch(e: StackOverflowError) {
+                    logger.log(Level.SEVERE, "Error while creating structure: $identifier", e)
+                    throw Error(e)
+                }
+            }
+            catch (e: ClassNotFoundException) {
+                logger.fine("Could not find the class $identifier! Using a dummy class!")
+                return ClassStructure(identifier.toChange(classSupplier = this::supplyClassChange), null, emptyList())
             }
         }
     } }

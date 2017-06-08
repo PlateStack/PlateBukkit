@@ -18,63 +18,86 @@ package org.platestack.bukkit.server.mappings
 
 import org.objectweb.asm.*
 import org.objectweb.asm.commons.Remapper
+import org.platestack.api.server.UniqueModification
 import java.io.InputStream
 import java.lang.reflect.Modifier
+import kotlin.concurrent.getOrSet
 
 // Scanners
 
-interface StreamScanner : Scanner {
-    val knownClasses: MutableMap<ClassIdentifier, ClassStructure>
+abstract class StreamScanner : Scanner {
+    abstract val knownClasses: MutableMap<ClassIdentifier, ClassStructure>
+    protected val loadingStructures = ThreadLocal<MutableSet<ClassIdentifier>>()
 
     fun supplyClass(identifier: ClassIdentifier, input: InputStream): ClassStructure {
-        val visitor = object : ClassVisitor(Opcodes.ASM5) {
-            lateinit var structure: ClassStructure
-            override fun visit(version: Int, access: Int, name: String?, signature: String?, superName: String?, interfaces: Array<out String>?) {
-                structure = ClassStructure(
-                        identifier.toChange { supplyClassChange(it) },
-                        superName?.let { supplyClass(ClassIdentifier(it)) },
-                        interfaces?.map { supplyClass(ClassIdentifier(it)) ?: throw ClassNotFoundException(it) } ?: emptyList()
-                )
-                knownClasses[structure.`class`.from] = structure
+        val loading = loadingStructures.getOrSet { mutableSetOf() }
+        if (!loading.add(identifier))
+            error("Cyclic loading from: $loading to $identifier")
+        try {
+            val visitor = object : ClassVisitor(Opcodes.ASM5) {
+                lateinit var structure: ClassStructure
+                override fun visit(version: Int, access: Int, name: String?, signature: String?, superName: String?, interfaces: Array<out String>?) {
+                    fun softSupplyClassChange(it: ClassIdentifier): ClassChange {
+                        return supplyClass(it)?.`class` ?: ClassChange(it.`package`.toChange(), it.parent?.let { softSupplyClassChange(it) }, Name(it.className))
+                    }
+
+                    val interfaceList = mutableListOf<ClassStructure>()
+
+                    structure = ClassStructure(null, null, interfaceList)
+                    knownClasses[identifier] = structure
+                    structure.`class` = ClassChange(identifier.`package`.toChange(), null, Name(identifier.className))
+                    loading.remove(identifier)
+
+                    identifier.parent?.let { structure.`class`.parent = softSupplyClassChange(it) }
+
+                    superName?.let { structure.`super` = supplyClass(ClassIdentifier(it)) }
+
+                    interfaces?.map { supplyClass(ClassIdentifier(it)) ?: throw ClassNotFoundException(it) }?.let {
+                        interfaceList += it
+                    }
+                }
+
+                override fun visitField(access: Int, name: String, desc: String, signature: String?, value: Any?): FieldVisitor? {
+                    val field = FieldIdentifier(name)
+                    val superStructure = structure.find(field)
+                    structure.fields[field] =
+                            superStructure?.let { FieldStructure(superStructure.field, it.owner, AccessLevel[access], SignatureType(desc) { supplyClassChange(it) }) }
+                                    ?: FieldStructure(
+                                            FieldChange(Name(field.name)),
+                                            structure.`class`, AccessLevel[access],
+                                            SignatureType(desc) { supplyClassChange(it) }
+                                    )
+
+                    return null
+                }
+
+                override fun visitMethod(access: Int, methodName: String, desc: String, signature: String?, exceptions: Array<String>?): MethodVisitor? {
+                    val method = MethodIdentifier(methodName, desc)
+                    val superStructure = structure.find(method)
+                    structure.methods[method] =
+                            superStructure?.let { MethodStructure(superStructure.method, it.owner, AccessLevel[access]) }
+                                    ?: MethodStructure(
+                                    MethodChange(
+                                            Name(method.name),
+                                            MethodSignature(method.signature) { supplyClassChange(it) }
+                                    ),
+                                    structure.`class`, AccessLevel[access]
+                            )
+
+                    return null
+                }
             }
 
-            override fun visitField(access: Int, name: String, desc: String, signature: String?, value: Any?): FieldVisitor? {
-                val field = FieldIdentifier(name)
-                val superStructure = structure.find(field)
-                structure.fields[field] =
-                        superStructure?.let { FieldStructure(superStructure.field, it.owner, AccessLevel[access], SignatureType(desc) { supplyClassChange(it) }) }
-                                ?: FieldStructure(
-                                        FieldChange(Name(field.name)),
-                                        structure.`class`, AccessLevel[access],
-                                        SignatureType(desc) { supplyClassChange(it) }
-                                )
-
-                return null
-            }
-
-            override fun visitMethod(access: Int, methodName: String, desc: String, signature: String?, exceptions: Array<String>?): MethodVisitor? {
-                val method = MethodIdentifier(methodName, desc)
-                val superStructure = structure.find(method)
-                structure.methods[method] =
-                        superStructure?.let { MethodStructure(superStructure.method, it.owner, AccessLevel[access]) }
-                                ?: MethodStructure(
-                                MethodChange(
-                                        Name(method.name),
-                                        MethodSignature(method.signature) { supplyClassChange(it) }
-                                ),
-                                structure.`class`, AccessLevel[access]
-                        )
-
-                return null
-            }
+            ClassReader(input).accept(visitor, 0)
+            return visitor.structure
         }
-
-        ClassReader(input).accept(visitor, 0)
-        return visitor.structure
+        finally {
+            loading.remove(identifier)
+        }
     }
 }
 
-open class ClassLoaderResourceScanner(val classLoader: ClassLoader): StreamScanner {
+open class ClassLoaderResourceScanner(val classLoader: ClassLoader): StreamScanner() {
     override val knownClasses = HashMap<ClassIdentifier, ClassStructure>()
 
     override fun supplyClass(identifier: ClassIdentifier): ClassStructure? {
@@ -84,6 +107,7 @@ open class ClassLoaderResourceScanner(val classLoader: ClassLoader): StreamScann
             return supplyClass(identifier, input)
         }
 
+        // TODO: Why are we throwing ClassNotFoundEx if we can return null? It makes no sense.
         throw ClassNotFoundException(identifier.fullName)
     }
 }
@@ -202,7 +226,14 @@ data class FieldStructure(val field: FieldChange, override val owner: ClassChang
     }
 }
 
-class ClassStructure(val `class`: ClassChange, val `super`: ClassStructure?, val interfaces: List<ClassStructure>) {
+class ClassStructure(`class`: ClassChange?, var `super`: ClassStructure?, val interfaces: List<ClassStructure>) {
+    var `class` by UniqueModification<ClassChange>()
+
+    init {
+        if(`class` != null)
+            this.`class` = `class`
+    }
+
     val fields = HashMap<FieldIdentifier, FieldStructure>()
     val methods = HashMap<MethodIdentifier, MethodStructure>()
 
@@ -324,7 +355,7 @@ data class ClassIdentifier(val `package`: PackageIdentifier, val parent: ClassId
 
     fun toChange(
             packageSupplier: (PackageIdentifier) -> PackageChange = {it.toChange()},
-            classSupplier: (ClassIdentifier) -> ClassChange
+            classSupplier: (ClassIdentifier) -> ClassChange?
     ): ClassChange = ClassChange(packageSupplier(`package`), parent?.let(classSupplier), Name(className))
 }
 
@@ -363,7 +394,7 @@ data class PackageChange(val name: Name) {
     }
 }
 
-data class ClassChange(val `package`: PackageChange, val parent: ClassChange?, val name: Name) {
+data class ClassChange(val `package`: PackageChange, var parent: ClassChange?, val name: Name) {
     val from: ClassIdentifier = ClassIdentifier(`package`.from, parent?.from, name.current)
     val to: ClassIdentifier get() = ClassIdentifier(`package`.to, parent?.to, name.reverse)
 
