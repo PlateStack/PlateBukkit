@@ -21,7 +21,7 @@ class Mappings {
     val methods = MethodMapping()
     val fields = FieldMapping()
 
-    fun <T> Map<T,T>.inverse() = map { it.value to it.key }
+    private fun <T> Map<T,T>.inverse() = map { it.value to it.key }
 
     fun inverse() = Mappings().also {
         it.classes += classes.inverse()
@@ -29,26 +29,108 @@ class Mappings {
         it.fields += fields.inverse()
     }
 
-    operator fun rem(mappings: Mappings) = times(mappings).also {
-        //val restored = it.classes.asSequence().filterNot { it.value in mappings.classes }.associate { it.key to (classes[it.key] ?: it.value) }
-        //it.classes += restored
+    fun toKnownStructure(): SimpleEnv {
+        val structures = SimpleEnv()
+
+        fun ClassIdentifier.toStructure(): ClassStructure {
+            structures[this]?.let { return it }
+            ClassStructure(toChange { it.toStructure().`class` }, null, emptyList()).let {
+                structures[this] = it
+                return it
+            }
+        }
+
+        classes.forEach { from, to ->
+            val structure = from.toStructure()
+            structure.`class`.`package`.name.reverse = to.`package`.toChange().name.current
+            structure.`class`.`package`.checkReverse()
+            structure.`class`.name.reverse = to.className
+        }
+
+        fields.forEach { (fromClass, fromField), (_, toField) ->
+            val structure = fromClass.toStructure()
+            val fieldChange = fromField.toChange()
+            fieldChange.name.reverse = toField.name
+            structure.fields[fromField] = FieldStructure(fieldChange, structure.`class`, AccessLevel.UNKNOWN, SignatureType(false, 'V', null))
+        }
+
+        methods.forEach { (fromClass, fromMethod), (_, toMethod) ->
+            val structure = fromClass.toStructure()
+            val methodChange = fromMethod.toChange { it.toStructure().`class` }
+            methodChange.name.reverse = toMethod.name
+            structure.methods[fromMethod] = MethodStructure(methodChange, structure.`class`, AccessLevel.UNKNOWN)
+        }
+
+        return structures
     }
 
-    operator fun times(mappings: Mappings) = Mappings().also {
+    fun bridge(mappings: Mappings, revertMissingClasses: Boolean = false, revertMissingFields: Boolean = false, reverMissingMethods: Boolean = false): Mappings {
+        val structures = toKnownStructure()
+
+        classes.forEach { from, to ->
+            val next = mappings.classes[to] ?: if(revertMissingClasses) from else to
+            structures[from]!!.`class`.let {
+                it.name.reverse = next.className
+                it.`package`.name.reverse = next.`package`.toChange().to.fullName
+                it.`package`.checkReverse()
+            }
+        }
+
+        fields.forEach { (fromClass, fromField), to ->
+            val next = mappings.fields[to]?.second ?: if(revertMissingFields) fromField else to.second
+            structures[fromClass]!!.fields[fromField]!!.field.name.reverse = next.name
+        }
+
+        methods.forEach { (fromClass, fromMethod), to ->
+            val next = mappings.methods[to]?.second ?: if(reverMissingMethods) fromMethod else to.second
+            structures[fromClass]!!.methods[fromMethod]!!.method.name.reverse = next.name
+        }
+
+        return structures.toMappings()
+    }
+
+    fun SimpleEnv.toMappings(): Mappings {
+        val result = Mappings()
+        result.classes += values.associate { structure ->
+            val from = structure.`class`.from
+            val to = structure.`class`.to
+
+            result.fields += structure.fields.values.associate { field ->
+                (from to field.field.from) to (to to field.field.to)
+            }
+
+            result.methods += structure.methods.values.associate { method ->
+                (from to method.method.from) to (to to method.method.to)
+            }
+
+            from to to
+        }
+        return result
+    }
+
+    operator fun rem(mappings: Mappings) = bridge(mappings, true, false, false) /* times(mappings).also {
+        val restored = it.classes.asSequence().filterNot { it.value in mappings.classes }.associate { it.key to (classes[it.key] ?: it.value) }
+        it.classes += restored
+    } */
+
+    operator fun times(mappings: Mappings) = bridge(mappings) /* Mappings().also {
         fun <T> Map<T,T>.bridge(map: Map<T,T>) = mapValues { map[it.value] ?: it.value }
         it.classes += classes.bridge(mappings.classes)
         it.methods += methods.bridge(mappings.methods)
         it.fields += fields.bridge(mappings.fields)
-    }
+    }*/
 
     operator fun plusAssign(mappings: Mappings) {
-        classes += mappings.classes
-        methods += mappings.methods
-        fields += mappings.fields
+        val result = this + mappings
+
+        classes += result.classes
+        methods += result.methods
+        fields += result.fields
     }
 
-    operator fun plus(mappings: Mappings) = Mappings().also {
-        it += this
-        it += mappings
+    operator fun plus(mappings: Mappings) : Mappings {
+        val structure = toKnownStructure()
+        structure.values.forEach { it.apply(mappings) }
+        return structure.toMappings()
     }
 }

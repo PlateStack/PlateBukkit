@@ -31,7 +31,7 @@ interface StreamScanner : Scanner {
             lateinit var structure: ClassStructure
             override fun visit(version: Int, access: Int, name: String?, signature: String?, superName: String?, interfaces: Array<out String>?) {
                 structure = ClassStructure(
-                        ClassChange(PackageChange(Name(identifier.`package`.fullName)), Name(identifier.className)),
+                        identifier.toChange { supplyClassChange(it) },
                         superName?.let { supplyClass(ClassIdentifier(it)) },
                         interfaces?.map { supplyClass(ClassIdentifier(it)) ?: throw ClassNotFoundException(it) } ?: emptyList()
                 )
@@ -281,10 +281,14 @@ data class MethodSignature(val returnType: SignatureType, val parameterTypes: Li
 
 data class FieldIdentifier(val name: String) {
     override fun toString() = name
+
+    fun toChange() = FieldChange(Name(name))
 }
 
 data class MethodIdentifier(val name: String, val signature: String) {
     override fun toString() = "$name $signature"
+
+    fun toChange(classSupplier: (ClassIdentifier) -> ClassChange): MethodChange = MethodChange(Name(name), MethodSignature(signature, classSupplier))
 }
 
 data class PackageIdentifier constructor(val parent: PackageIdentifier?, val name: String) {
@@ -300,14 +304,28 @@ data class PackageIdentifier constructor(val parent: PackageIdentifier?, val nam
     val fullName = if(parent != null) "$parent$name" else name
     val prefix = if(name.isBlank()) "" else "$fullName/"
     override fun toString() = prefix
+
+    fun toChange(): PackageChange = PackageChange(Name(fullName))
 }
 
-data class ClassIdentifier(val `package`: PackageIdentifier, val className: String) {
-    constructor(packageName: String, className: String): this(PackageIdentifier(packageName), className)
+data class ClassIdentifier(val `package`: PackageIdentifier, val parent: ClassIdentifier?, val className: String) {
+    private constructor(`package`: PackageIdentifier, parts: List<String>):
+            this(`package`,
+                    if(parts.size == 1) null
+                    else ClassIdentifier(`package`, parts.subList(0, parts.size -1)),
+                    parts.last()
+            )
+
+    constructor(packageName: String, className: String): this(PackageIdentifier(packageName), className.split('$'))
     constructor(fullName: String): this(fullName.substringBeforeLast('/', ""), fullName.substringAfterLast('/'))
 
-    val fullName = `package`.prefix + className
+    val fullName: String = (if(parent == null) `package`.prefix else parent.fullName + '$') + className
     override fun toString() = fullName
+
+    fun toChange(
+            packageSupplier: (PackageIdentifier) -> PackageChange = {it.toChange()},
+            classSupplier: (ClassIdentifier) -> ClassChange
+    ): ClassChange = ClassChange(packageSupplier(`package`), parent?.let(classSupplier), Name(className))
 }
 
 // Named
@@ -345,9 +363,9 @@ data class PackageChange(val name: Name) {
     }
 }
 
-data class ClassChange(val `package`: PackageChange, val name: Name) {
-    val from = ClassIdentifier(`package`.from, name.current)
-    val to get() = ClassIdentifier(`package`.to, name.reverse)
+data class ClassChange(val `package`: PackageChange, val parent: ClassChange?, val name: Name) {
+    val from: ClassIdentifier = ClassIdentifier(`package`.from, parent?.from, name.current)
+    val to: ClassIdentifier get() = ClassIdentifier(`package`.to, parent?.to, name.reverse)
 
     fun apply(mappings: Mappings) {
         mappings.classes[from]?.also { new ->
@@ -356,4 +374,11 @@ data class ClassChange(val `package`: PackageChange, val name: Name) {
             `package`.checkReverse()
         }
     }
+
+    fun deepCopy(`package`: PackageChange = PackageChange(Name(this.`package`.name.current, this.`package`.name.reverse))) : ClassChange =
+            ClassChange(
+                    `package`,
+                    parent?.deepCopy(`package`),
+                    Name(name.current, name.reverse)
+            )
 }

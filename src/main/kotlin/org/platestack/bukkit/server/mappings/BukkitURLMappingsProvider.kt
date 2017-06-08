@@ -72,28 +72,35 @@ class BukkitURLMappingsProvider(val base: URL, val scanner: Scanner, val logger:
         /**
          * NiceName -> net/minecraft/server/v5/NiceName
          */
+        val emptyPackage = PackageIdentifier(null, "")
         val fromNoPackage = Mappings().also {
-            it.classes += mappings.classes.map { ClassIdentifier(it.value.className) to it.value }
+            it.classes += mappings.classes.map { it.value.let { ClassIdentifier(emptyPackage, it.parent, it.className) } to it.value }
         }
 
         fun SignatureType.isolated() =
                 if(type == null) this
-                else copy(type = ClassChange(PackageChange(Name(type.`package`.name.current, type.`package`.name.reverse)), Name(type.name.current, type.name.reverse)))
+                else copy(type = type.deepCopy())
 
         /**
          * net/minecraft/server/v5/NiceName -> aaaa
          */
         val inverse = mappings.inverse()
 
+        val nms = PackageIdentifier("net/minecraft/server/$packageVersion")
         fun remapOrRegisterNoPackage(classId: ClassIdentifier): ClassIdentifier {
             return fromNoPackage.classes[classId] ?: classId.let {
                 val from = it
                 val to =
                         ClassIdentifier(
-                                if(classId.`package`.prefix.isBlank())
-                                    "net/minecraft/server/$packageVersion/${classId.className}"
-                                else
-                                    classId.fullName.replace("net/minecraft/server/", "net/minecraft/server/$packageVersion/")
+                                classId.`package`.takeIf { it.prefix.isNotBlank() && it.fullName != "net/minecraft/server" }?.let {
+                                    if(it.fullName.startsWith("net/minecraft/server/"))
+                                        PackageIdentifier(it.fullName.replace("net/minecraft/server/", nms.fullName))
+                                    else
+                                        it
+                                } ?: nms
+                                ,
+                                classId.parent?.let { remapOrRegisterNoPackage(it) },
+                                classId.className
                         )
 
                 if(from != to)

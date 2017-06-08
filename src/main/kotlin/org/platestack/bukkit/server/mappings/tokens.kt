@@ -28,3 +28,5 @@ typealias FieldToken = Pair<ClassIdentifier, FieldIdentifier>
 typealias FieldMapping = HashMap<FieldToken, FieldToken>
 
 fun Stream<String>.filterComments() = map(String::trim).filter(String::isNotBlank).filter { !it.startsWith('#') }!!
+
+internal typealias SimpleEnv = HashMap<ClassIdentifier, ClassStructure>
