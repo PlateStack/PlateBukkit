@@ -23,6 +23,32 @@ class Mappings {
 
     private fun <T> Map<T,T>.inverse() = map { it.value to it.key }
 
+    fun removeUselessEntries() {
+        val uselessFields = fields.entries.filter { (from, to) -> from.second.name == to.second.name }
+        val uselessMethods = methods.entries.filter { (from, to) -> from.second.name == to.second.name }
+
+        fields.keys.removeAll(uselessFields.map { it.key })
+        methods.keys.removeAll(uselessMethods.map { it.key })
+
+        val uselessClasses = classes.entries.filter { (fromClass, toClass) ->
+            fromClass == toClass && fields.none { it.key.first == fromClass } && methods.none { it.key.first == fromClass }
+        }
+
+        classes.keys.removeAll(uselessClasses.map { it.key })
+    }
+
+    fun removeSRGClientMappings() {
+        val clientFields = fields.entries.filter { (from, _) -> from.first.`package`.fullName.startsWith("net/minecraft/client") }
+        val clientMethods = methods.entries.filter { (from, _) -> from.first.`package`.fullName.startsWith("net/minecraft/client") }
+
+        fields.keys.removeAll(clientFields.map { it.key })
+        methods.keys.removeAll(clientMethods.map { it.key })
+
+        val clientClasses = classes.entries.filter { (fromClass, _) -> fromClass.`package`.fullName.startsWith("net/minecraft/client") }
+
+        classes.keys.removeAll(clientClasses.map { it.key })
+    }
+
     fun inverse() = Mappings().also {
         it.classes += classes.inverse()
         it.methods += methods.inverse()
@@ -108,17 +134,15 @@ class Mappings {
         return result
     }
 
-    operator fun rem(mappings: Mappings) = bridge(mappings, true, false, false) /* times(mappings).also {
-        val restored = it.classes.asSequence().filterNot { it.value in mappings.classes }.associate { it.key to (classes[it.key] ?: it.value) }
-        it.classes += restored
-    } */
+    operator fun rem(mappings: Mappings) = bridge(mappings, true, false, false).also {
+        removeSRGClientMappings()
+        removeUselessEntries()
+    }
 
-    operator fun times(mappings: Mappings) = bridge(mappings) /* Mappings().also {
-        fun <T> Map<T,T>.bridge(map: Map<T,T>) = mapValues { map[it.value] ?: it.value }
-        it.classes += classes.bridge(mappings.classes)
-        it.methods += methods.bridge(mappings.methods)
-        it.fields += fields.bridge(mappings.fields)
-    }*/
+    operator fun times(mappings: Mappings) = bridge(mappings).also {
+        removeSRGClientMappings()
+        removeUselessEntries()
+    }
 
     operator fun plusAssign(mappings: Mappings) {
         val result = this + mappings
