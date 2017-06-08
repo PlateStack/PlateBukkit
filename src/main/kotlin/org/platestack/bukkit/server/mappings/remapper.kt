@@ -38,7 +38,7 @@ abstract class StreamScanner : Scanner {
                 lateinit var structure: ClassStructure
                 override fun visit(version: Int, access: Int, name: String?, signature: String?, superName: String?, interfaces: Array<out String>?) {
                     fun softSupplyClassChange(it: ClassIdentifier): ClassChange {
-                        return supplyClass(it)?.`class` ?: ClassChange(it.`package`.toChange(), it.parent?.let { softSupplyClassChange(it) }, Name(it.className))
+                        return supplyClass(it)?.`class` ?: ClassStructure(identifier.toChange(classSupplier = { supplyClassChange(it) }), null, emptyList()).`class` //ClassChange(it.`package`.toChange(), it.parent?.let { softSupplyClassChange(it) }, Name(it.className))
                     }
 
                     val interfaceList = mutableListOf<ClassStructure>()
@@ -114,7 +114,7 @@ open class ClassLoaderResourceScanner(val classLoader: ClassLoader): StreamScann
 
 interface Scanner {
     fun supplyClassChange(identifier: ClassIdentifier): ClassChange {
-        return supplyClass(identifier)?.`class` ?: throw ClassNotFoundException(identifier.fullName)
+        return supplyClass(identifier)?.`class` ?: ClassStructure(identifier.toChange(classSupplier = this::supplyClassChange), null, emptyList()).`class` //throw ClassNotFoundException(identifier.fullName)
     }
 
     fun supplyClass(identifier: ClassIdentifier): ClassStructure? = null
@@ -132,54 +132,70 @@ class ClassRemapEnvironment(
 ) : Remapper() {
     constructor(scanner: Scanner): this(scanner::supplyClass, scanner::supplyField, scanner::supplyMethod)
     val classes = HashMap<ClassIdentifier, ClassStructure>()
-    var mappings = mappings; private set
+    var mappings = mappings.inverse(); private set
+    var reverse = mappings
 
     fun apply(mappings: Mappings) {
         classes.values.forEach { it.apply(mappings) }
-        this.mappings = mappings
+        this.mappings = mappings.inverse()
+        reverse = mappings
     }
 
     private operator fun get(fromFullClassName: String) = get(ClassIdentifier(fromFullClassName))
 
     private fun register(structure: ClassStructure) {
-        classes.computeIfAbsent(structure.`class`.from) { _ ->
+        structure.apply(mappings)
+        classes.computeIfAbsent(structure.`class`.to) { _ ->
             structure.`super`?.let { register(it) }
             structure.interfaces.forEach { register(it) }
-            structure.apply(mappings)
             structure
         }
     }
 
-    operator fun get(fromClass: ClassIdentifier) =
-            classes[fromClass]
-            ?:
-            classBuilder?.invoke(fromClass)?.also { register(it) }
+    operator fun get(foreign: ClassIdentifier) : ClassStructure? {
+        classes[foreign]?.let { return it }
+
+        val native = reverse.classes[foreign] ?: foreign
+        return classBuilder?.invoke(native)?.also { register(it) }
+    }
 
 
     override fun map(fromFullClassName: String): String {
-        return get(fromFullClassName)?.`class`?.to?.toString() ?: fromFullClassName
+        val foreign = ClassIdentifier(fromFullClassName)
+        classes[foreign]?.let { return it.`class`.from.fullName }
+
+        val native = reverse.classes[foreign] ?: foreign
+        classBuilder?.invoke(native)?.also { register(it) }
+        return native.fullName
+
+        //TODO("Not the information correctly")
+        //val id = ClassIdentifier(fromFullClassName)
+        //get(id)?.`class`?.to?.toString()?.let { return it }
+        //val to = mappings.classes[id] ?: return fromFullClassName
+        //val destiny = classBuilder?.invoke(to) ?: return fromFullClassName
+
     }
 
     override fun mapFieldName(owner: String, name: String, desc: String): String {
         val classStructure = get(owner) ?: return name
         val identifier = FieldIdentifier(name)
-        val fieldStructure = classStructure.find(identifier) ?: fieldBuilder?.invoke(classStructure, identifier)?.also {
+        val fieldStructure = classStructure.findReverse(identifier) ?: fieldBuilder?.invoke(classStructure, identifier)?.also {
             classStructure.fields[it.field.from] = it
             it.apply(mappings)
         }
 
-        return fieldStructure?.field?.to?.name ?: name
+        return fieldStructure?.field?.from?.name ?: name
     }
 
     override fun mapMethodName(owner: String, name: String, desc: String): String {
         val classStructure = get(owner) ?: return name
         val identifier = MethodIdentifier(name, desc)
-        val methodStructure = classStructure.find(identifier) ?: methodBuilder?.invoke(classStructure, identifier)?.also {
+        val methodStructure = classStructure.findReverse(identifier) ?: methodBuilder?.invoke(classStructure, identifier)?.also {
             classStructure.methods[it.method.from] = it
             it.apply(mappings)
         }
 
-        return methodStructure?.method?.to?.name ?: name
+        return methodStructure?.method?.from?.name ?: name
     }
 }
 
@@ -253,6 +269,17 @@ class ClassStructure(`class`: ClassChange?, var `super`: ClassStructure?, val in
             .filter { it.canBeAccessedBy(viewer) }
             .firstOrNull()
 
+    fun findReverse(method: MethodIdentifier, viewer: ClassStructure): MethodStructure? =
+            sequenceOf(
+                    methods[method],
+                    methods.values.find { it.method.to == method },
+                    `super`?.findReverse(method, viewer),
+                    interfaces.asSequence().mapNotNull { it.findReverse(method, viewer) }.firstOrNull()
+            )
+            .filterNotNull()
+            .filter { it.canBeAccessedBy(viewer) }
+            .firstOrNull()
+
     fun find(field: FieldIdentifier, viewer: ClassStructure): FieldStructure? =
             sequenceOf(
                     fields[field],
@@ -263,15 +290,36 @@ class ClassStructure(`class`: ClassChange?, var `super`: ClassStructure?, val in
             .filter { it.canBeAccessedBy(viewer) }
             .firstOrNull()
 
+    fun findReverse(field: FieldIdentifier, viewer: ClassStructure): FieldStructure? =
+            sequenceOf(
+                    fields[field],
+                    fields.values.find { it.field.to == field },
+                    `super`?.findReverse(field, viewer),
+                    interfaces.asSequence().mapNotNull { it.findReverse(field, viewer) }.firstOrNull()
+            )
+            .filterNotNull()
+            .filter { it.canBeAccessedBy(viewer) }
+            .firstOrNull()
+
     fun find(field: FieldIdentifier): FieldStructure?
             = fields[field]
             ?: `super`?.find(field, this)
             ?: interfaces.asSequence().mapNotNull { it.find(field, this) }.firstOrNull()
 
+    fun findReverse(field: FieldIdentifier): FieldStructure?
+            = fields[field] ?: fields.values.find { it.field.to == field }
+            ?: `super`?.findReverse(field, this)
+            ?: interfaces.asSequence().mapNotNull { it.findReverse(field, this) }.firstOrNull()
+
     fun find(method: MethodIdentifier): MethodStructure?
             = methods[method]
             ?: `super`?.find(method, this)
             ?: interfaces.asSequence().mapNotNull { it.find(method, this) }.firstOrNull()
+
+    fun findReverse(method: MethodIdentifier): MethodStructure?
+            = methods[method] ?: methods.values.find { it.method.to == method }
+            ?: `super`?.findReverse(method, this)
+            ?: interfaces.asSequence().mapNotNull { it.findReverse(method, this) }.firstOrNull()
 }
 
 // Signatures

@@ -52,6 +52,8 @@ object BukkitTransformer: Transformer {
                 Files.newBufferedWriter(Paths.get("srg-craftbukkit.srg")).use { mappings.exportSRG(it) }
             }
         }
+
+        //SimpleRemapEnvironment(mappingProvider(minecraftVersion, bukkitVersion, packageVersion))
         ClassRemapEnvironment(scanner).apply {
             apply(mappingProvider(minecraftVersion, bukkitVersion, packageVersion))
         }
@@ -92,8 +94,9 @@ object BukkitTransformer: Transformer {
                 }
             }
             catch (e: ClassNotFoundException) {
-                logger.fine("Could not find the class $identifier! Using a dummy class!")
-                return ClassStructure(identifier.toChange(classSupplier = this::supplyClassChange), null, emptyList())
+                //logger.fine("Could not find the class $identifier! Using a dummy class!")
+                //return ClassStructure(identifier.toChange(classSupplier = this::supplyClassChange), null, emptyList())
+                return null
             }
         }
     } }

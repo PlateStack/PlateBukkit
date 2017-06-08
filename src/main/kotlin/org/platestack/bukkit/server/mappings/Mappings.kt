@@ -161,13 +161,13 @@ class Mappings {
     }
 
     operator fun rem(mappings: Mappings) = bridge(mappings, true, false, false).apply {
-        removeSRGClientMappings()
-        removeUselessEntries()
+        //removeSRGClientMappings()
+        //removeUselessEntries()
     }
 
     operator fun times(mappings: Mappings) = bridge(mappings).apply {
-        removeSRGClientMappings()
-        removeUselessEntries()
+        //removeSRGClientMappings()
+        //removeUselessEntries()
     }
 
     operator fun plusAssign(mappings: Mappings) {
