@@ -16,37 +16,63 @@
 
 package org.platestack.bukkit.server.mappings
 
+import java.io.Writer
+import java.util.*
+
 class Mappings {
     val classes = ClassMapping()
     val methods = MethodMapping()
     val fields = FieldMapping()
 
+    fun exportSRG(writer: Writer) {
+        fun PackageIdentifier.toSRG() = if(fullName.isBlank()) "." else fullName
+        classes.asSequence()
+                .map { (from,to) -> from.`package` to to.`package` }
+                .filterNot { (from,to) -> from == to }
+                .groupBy { it.first }
+                .mapValuesTo(TreeMap<PackageIdentifier, PackageIdentifier>(compareBy { it.fullName })) { (_, value) ->
+                    if (value.size == 1) value.first().second
+                    else value.maxBy { (_, alt) -> classes.keys.count { it.`package` == alt } }!!.second
+                }
+                .forEach { (from, to) ->
+                    writer.write("PK: ${from.toSRG()} ${to.toSRG()}\n")
+                }
+
+        classes.asSequence().sortedBy { it.key.fullName }.forEach { (from, to) ->
+            writer.write("CL: $from $to\n")
+        }
+
+        fields.asSequence().sortedWith(compareBy({ it.key.first.fullName }, { it.key.second.name })).forEach { (from, to) ->
+            writer.write("FD: ${from.first}/${from.second.name} ${to.first}/${to.second}\n")
+        }
+
+        methods.asSequence().sortedWith(compareBy({ it.key.first.fullName }, { it.key.second.name }, { it.key.second.signature })).forEach { (from, to) ->
+            writer.write("MD: ${from.first}/${from.second.name} ${from.second.signature} ${to.first}/${to.second.name} ${to.second.signature}\n")
+        }
+    }
+
     private fun <T> Map<T,T>.inverse() = map { it.value to it.key }
 
     fun removeUselessEntries() {
-        val uselessFields = fields.entries.filter { (from, to) -> from.second.name == to.second.name }
-        val uselessMethods = methods.entries.filter { (from, to) -> from.second.name == to.second.name }
+        fields.entries.removeIf { (from, to) -> from.second.name == to.second.name }
+        methods.entries.removeIf { (from, to) -> from.second.name == to.second.name }
+        classes.entries.removeIf { (from, to) ->
+            from == to &&
 
-        fields.keys.removeAll(uselessFields.map { it.key })
-        methods.keys.removeAll(uselessMethods.map { it.key })
+                    fields.none {
+                        it.key.first == from
+                    } &&
 
-        val uselessClasses = classes.entries.filter { (fromClass, toClass) ->
-            fromClass == toClass && fields.none { it.key.first == fromClass } && methods.none { it.key.first == fromClass }
+                    methods.none {
+                        it.key.first == from
+                    }
         }
-
-        classes.keys.removeAll(uselessClasses.map { it.key })
     }
 
     fun removeSRGClientMappings() {
-        val clientFields = fields.entries.filter { (from, _) -> from.first.`package`.fullName.startsWith("net/minecraft/client") }
-        val clientMethods = methods.entries.filter { (from, _) -> from.first.`package`.fullName.startsWith("net/minecraft/client") }
-
-        fields.keys.removeAll(clientFields.map { it.key })
-        methods.keys.removeAll(clientMethods.map { it.key })
-
-        val clientClasses = classes.entries.filter { (fromClass, _) -> fromClass.`package`.fullName.startsWith("net/minecraft/client") }
-
-        classes.keys.removeAll(clientClasses.map { it.key })
+        fields.entries.removeIf { (from, _) -> from.first.`package`.fullName.startsWith("net/minecraft/client") }
+        methods.entries.removeIf { (from, _) -> from.first.`package`.fullName.startsWith("net/minecraft/client") }
+        classes.entries.removeIf { (fromClass, _) -> fromClass.`package`.fullName.startsWith("net/minecraft/client") }
     }
 
     fun inverse() = Mappings().also {
@@ -134,12 +160,12 @@ class Mappings {
         return result
     }
 
-    operator fun rem(mappings: Mappings) = bridge(mappings, true, false, false).also {
+    operator fun rem(mappings: Mappings) = bridge(mappings, true, false, false).apply {
         removeSRGClientMappings()
         removeUselessEntries()
     }
 
-    operator fun times(mappings: Mappings) = bridge(mappings).also {
+    operator fun times(mappings: Mappings) = bridge(mappings).apply {
         removeSRGClientMappings()
         removeUselessEntries()
     }

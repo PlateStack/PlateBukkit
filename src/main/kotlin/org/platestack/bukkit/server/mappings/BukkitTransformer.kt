@@ -26,6 +26,8 @@ import org.platestack.bukkit.server.PlateStackLoader
 import org.platestack.common.plugin.loader.Transformer
 import java.io.File
 import java.io.InputStream
+import java.nio.file.Files
+import java.nio.file.Paths
 import java.util.logging.Logger
 
 @ReflectionTarget(PlateStackLoader::class)
@@ -45,7 +47,9 @@ object BukkitTransformer: Transformer {
         val bukkitMappings = BukkitURLMappingsProvider(repository, scanner, logger)
         val srgMappings = Srg2NotchURLMappingsProvider(repository, logger)
         mappingProvider = MappingsProvider { a,b,c ->
-            srgMappings(a,b,c) % bukkitMappings(a,b,c)
+            (srgMappings(a,b,c) % bukkitMappings(a,b,c)).also { mappings ->
+                Files.newBufferedWriter(Paths.get("srg-craftbukkit.srg")).use { mappings.exportSRG(it) }
+            }
         }
         ClassRemapEnvironment(scanner).apply {
             apply(mappingProvider(minecraftVersion, bukkitVersion, packageVersion))
