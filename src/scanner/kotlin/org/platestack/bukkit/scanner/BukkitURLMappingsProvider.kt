@@ -14,7 +14,7 @@
  *  limitations under the License.
  */
 
-package org.platestack.bukkit.server.mappings
+package org.platestack.bukkit.scanner
 
 import java.io.BufferedReader
 import java.io.InputStream
@@ -79,7 +79,7 @@ class BukkitURLMappingsProvider(val base: URL, val scanner: Scanner, val logger:
 
         fun SignatureType.isolated() =
                 if(type == null) this
-                else copy(type = type.deepCopy())
+                else copy(type = type!!.deepCopy())
 
         /**
          * net/minecraft/server/v5/NiceName -> aaaa
@@ -93,7 +93,7 @@ class BukkitURLMappingsProvider(val base: URL, val scanner: Scanner, val logger:
                 val to =
                         ClassIdentifier(
                                 classId.`package`.takeIf { it.prefix.isNotBlank() && it.fullName != "net/minecraft/server" }?.let {
-                                    if(it.fullName.startsWith("net/minecraft/server/"))
+                                    if (it.fullName.startsWith("net/minecraft/server/"))
                                         PackageIdentifier(it.fullName.replace("net/minecraft/server/", nms.fullName))
                                     else
                                         it

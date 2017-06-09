@@ -14,11 +14,10 @@
  *  limitations under the License.
  */
 
-package org.platestack.bukkit.server.mappings
+package org.platestack.bukkit.scanner
 
 import org.objectweb.asm.*
 import org.objectweb.asm.commons.Remapper
-import org.platestack.api.server.UniqueModification
 import java.io.InputStream
 import java.lang.reflect.Modifier
 import kotlin.concurrent.getOrSet
@@ -63,10 +62,10 @@ abstract class StreamScanner : Scanner {
                     structure.fields[field] =
                             superStructure?.let { FieldStructure(superStructure.field, it.owner, AccessLevel[access], SignatureType(desc) { supplyClassChange(it) }) }
                                     ?: FieldStructure(
-                                            FieldChange(Name(field.name)),
-                                            structure.`class`, AccessLevel[access],
-                                            SignatureType(desc) { supplyClassChange(it) }
-                                    )
+                                    FieldChange(Name(field.name)),
+                                    structure.`class`, AccessLevel[access],
+                                    SignatureType(desc) { supplyClassChange(it) }
+                            )
 
                     return null
                 }
@@ -330,7 +329,7 @@ data class SignatureType(val array: Boolean, val descriptor: Char, val type: Cla
     private constructor(b: StringBuilder, classSupplier: (ClassIdentifier) -> ClassChange)
             : this(
                 if(b.first() == '[') { b.deleteCharAt(0); true } else false,
-                b.first(), b.first().let { if(it == 'L') classSupplier(ClassIdentifier(b.substring(1, b.length -1))) else null }
+                b.first(), b.first().let { if(it == 'L') classSupplier(ClassIdentifier(b.substring(1, b.length - 1))) else null }
             )
     val from = if(array) "[" else {""} + descriptor + (type?.from?.fullName?.let { it+';' } ?: "")
     val to get() = if(array) "[" else {""} + descriptor + (type?.to?.fullName?.let { it+';' } ?: "")
@@ -344,7 +343,7 @@ private val signaturePattern = Regex("\\[?([BCDFIJSZV]|L[^;]+;)")
 data class MethodSignature(val returnType: SignatureType, val parameterTypes: List<SignatureType>) {
     constructor(signature: String, classSupplier: (ClassIdentifier)-> ClassChange)
             : this(
-                SignatureType(signature.substringAfterLast(')'), classSupplier),
+            SignatureType(signature.substringAfterLast(')'), classSupplier),
                 signaturePattern.findAll(signature.substringBeforeLast(')').substring(1)).map { SignatureType(it.value, classSupplier) }.toList()
             )
     val from = '('+parameterTypes.asSequence().map { it.from }.joinToString("")+')'+returnType.from
@@ -391,7 +390,7 @@ data class ClassIdentifier(val `package`: PackageIdentifier, val parent: ClassId
     private constructor(`package`: PackageIdentifier, parts: List<String>):
             this(`package`,
                     if(parts.size == 1) null
-                    else ClassIdentifier(`package`, parts.subList(0, parts.size -1)),
+                    else ClassIdentifier(`package`, parts.subList(0, parts.size - 1)),
                     parts.last()
             )
 

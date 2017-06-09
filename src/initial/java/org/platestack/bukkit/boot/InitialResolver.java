@@ -14,7 +14,7 @@
  *  limitations under the License.
  */
 
-package org.platestack.bukkit.server;
+package org.platestack.bukkit.boot;
 
 import org.bukkit.plugin.java.JavaPlugin;
 import org.platestack.libraryloader.ivy.LibraryResolver;
@@ -30,9 +30,6 @@ import java.util.Set;
 
 public final class InitialResolver
 {
-    private InitialResolver()
-    {}
-
     public static List<File> resolve(JavaPlugin plugin, List<InputStream> lists) throws IOException, ParseException
     {
         try
@@ -61,4 +58,6 @@ public final class InitialResolver
             });
         }
     }
+
+    private InitialResolver() {}
 }

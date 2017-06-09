@@ -32,6 +32,7 @@ import org.platestack.api.server.PlateStack
 import org.platestack.api.server.PlatformNamespace
 import org.platestack.api.server.internal.InternalAccessor
 import org.platestack.api.structure.ReflectionTarget
+import org.platestack.bukkit.boot.PlateStackLoader
 import org.platestack.bukkit.message.BukkitTranslator
 import org.platestack.bukkit.plugin.BukkitNamespace
 import org.platestack.common.plugin.loader.CommonLoader

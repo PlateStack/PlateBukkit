@@ -14,16 +14,22 @@
  *  limitations under the License.
  */
 
-package org.platestack.bukkit.server.mappings;
+package org.platestack.bukkit.scanner
 
-import org.jetbrains.annotations.NotNull;
+import kotlin.reflect.KProperty
 
-import java.io.IOException;
+//TODO This is a copy of the one provided by plate-api, find a way to use that instead
+internal class UniqueModification<V: Any> {
 
-@FunctionalInterface
-public interface MappingsProvider
-{
-    @NotNull
-    Mappings invoke(@NotNull String minecraftVersion, @NotNull String bukkitVersion, @NotNull String packageVersion)
-            throws IOException;
+    private var field: V? = null
+
+    operator fun getValue(thisRef: Any?, property: KProperty<*>): V {
+        return field ?: throw UninitializedPropertyAccessException("No value has been set to ${property.name} yet")
+    }
+    operator fun setValue(thisRef: Any?, property: KProperty<*>, value: V) {
+        if(field != null)
+            error("The value can be modified only one time.")
+
+        this.field = value
+    }
 }

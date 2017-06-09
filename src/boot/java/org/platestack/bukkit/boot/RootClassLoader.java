@@ -14,19 +14,17 @@
  *  limitations under the License.
  */
 
-package org.platestack.bukkit.server.mappings
+package org.platestack.bukkit.boot;
 
-import java.util.stream.Stream
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.util.Arrays;
+import java.util.stream.Stream;
 
-typealias ClassToken = ClassIdentifier
-typealias ClassMapping = HashMap<ClassToken, ClassToken>
-
-typealias MethodToken = Pair<ClassIdentifier, MethodIdentifier>
-typealias MethodMapping = HashMap<MethodToken, MethodToken>
-
-typealias FieldToken = Pair<ClassIdentifier, FieldIdentifier>
-typealias FieldMapping = HashMap<FieldToken, FieldToken>
-
-fun Stream<String>.filterComments() = map(String::trim).filter(String::isNotBlank).filter { !it.startsWith('#') }!!
-
-internal typealias SimpleEnv = HashMap<ClassIdentifier, ClassStructure>
+public class RootClassLoader extends URLClassLoader
+{
+    public RootClassLoader(final PlateStackLoader plugin, final URL[] plateModules, final ClassLoader pluginClassLoader, final URL[] dependencies)
+    {
+        super(Stream.concat(Arrays.stream(plateModules), Arrays.stream(dependencies)).toArray(URL[]::new), pluginClassLoader);
+    }
+}

@@ -14,7 +14,7 @@
  *  limitations under the License.
  */
 
-package org.platestack.bukkit.server.mappings
+package org.platestack.bukkit.scanner
 
 import java.io.Reader
 import java.net.URL
@@ -49,7 +49,7 @@ class Srg2NotchURLMappingsProvider(val base: URL, val logger: Logger) : Mappings
         val mappings = Mappings()
         val classes = mutableMapOf<String, ClassIdentifier>()
 
-        fun String.classToken(): ClassToken = classes.computeIfAbsent(this) { _ -> ClassIdentifier(this)}
+        fun String.classToken(): ClassToken = classes.computeIfAbsent(this) { _ -> ClassIdentifier(this) }
         groups["CL:"]!!.associate {
             it[1].classToken() to it[2].classToken()
         }.let {

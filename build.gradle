@@ -30,14 +30,12 @@ buildscript {
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
         classpath "org.jetbrains.dokka:dokka-gradle-plugin:${dokka_version}"
         classpath 'org.junit.platform:junit-platform-gradle-plugin:1.0.0-M4'
-        classpath 'com.github.jengelman.gradle.plugins:shadow:1.2.3'
     }
 }
 
 apply plugin: 'kotlin'
 apply plugin: 'org.jetbrains.dokka'
 apply plugin: 'org.junit.platform.gradle.plugin'
-apply plugin: 'com.github.johnrengelman.shadow'
 
 repositories {
     mavenCentral()
@@ -46,14 +44,63 @@ repositories {
     maven { url = 'https://hub.spigotmc.org/nexus/content/groups/public/' }
 }
 
-dependencies {
-    compile project(':plate-common')
-    compile 'org.ow2.asm:asm-tree:5.2'
-    compile 'org.ow2.asm:asm-commons:5.2'
-    compile 'org.bukkit:bukkit:1.12-pre5-SNAPSHOT'
-    compile 'org.slf4j:slf4j-simple:1.7.25'
-    compile 'org.eclipse.jgit:org.eclipse.jgit:4.7.0.201704051617-r'
+configurations {
+    compileBoot
 
+    compileInitial {
+        extendsFrom compileBoot
+    }
+
+    compileScanner {
+        extendsFrom compileBoot
+    }
+
+    compile {
+        extendsFrom compileBoot, compileScanner
+    }
+}
+
+sourceSets {
+    boot {
+        java.srcDirs = ['src/boot/java']
+        kotlin.srcDirs = []
+        resources.srcDirs = ['src/boot/resources']
+        compileClasspath = configurations.compileBoot
+    }
+
+    scanner {
+        java.srcDirs = ['src/scanner/java']
+        kotlin.srcDirs = ['src/scanner/kotlin']
+        resources.srcDirs = ['src/scanner/resources']
+        compileClasspath = configurations.compileScanner
+    }
+
+    initial {
+        java.srcDirs = ['src/initial/java']
+        kotlin.srcDirs = []
+        resources.srcDirs = ['src/initial/resources']
+        compileClasspath = configurations.compileInitial
+    }
+}
+
+dependencies {
+    compileBoot 'org.bukkit:bukkit:1.12-pre5-SNAPSHOT'
+
+    compileScanner sourceSets.boot.output
+    compileScanner "org.jetbrains.kotlin:kotlin-stdlib-jre8:$kotlin_version"
+    compileScanner "org.jetbrains.kotlin:kotlin-reflect:$kotlin_version"
+    compileScanner 'org.ow2.asm:asm-tree:5.2'
+    compileScanner 'org.ow2.asm:asm-commons:5.2'
+
+    compileInitial sourceSets.boot.output
+    compileInitial project(':library-loader')
+
+    compile sourceSets.scanner.output
+    compile project(':plate-common')
+    compile 'org.slf4j:slf4j-simple:1.7.25'
+    //compile 'org.eclipse.jgit:org.eclipse.jgit:4.7.0.201704051617-r'
+
+    testCompile sourceSets.initial.output
     testCompile 'org.mockito:mockito-core:1.+'
     testCompile 'org.jetbrains.spek:spek-api:1.1.1'
     testCompile 'org.junit.platform:junit-platform-runner:1.0.0-M4'
@@ -61,23 +108,46 @@ dependencies {
 }
 
 jar {
-    from sourceSets.main.allSource
     from {
         ["CHANGELOG.md", "LICENSE.txt", "LICENSE-LIBRARIES.md"]
     }
 }
 
-shadowJar {
+task initialJar(type: Jar, dependsOn: ':initialClasses') {
+    classifier = 'initial'
+    from(sourceSets.initial.output)
+}
+
+task bootJar(type: Jar, dependsOn: [':initialClasses', ':classes', ':plate-common:classes', ':plate-api:classes', ':bootClasses', ':library-loader:classes']) {
+    classifier = 'all'
+    into('META-INF/modules') {
+        into('initial') {
+            from sourceSets.initial.output
+        }
+
+        into('library-loader') {
+            from { project(':library-loader').sourceSets.main.output }
+        }
+
+        into('main') {
+            from sourceSets.main.output
+            from { project(':plate-api:immutable-collections').sourceSets.main.output }
+            from { project(':plate-common').sourceSets.main.output }
+            from { project(':plate-api').sourceSets.main.output }
+        }
+    }
+
+    from(sourceSets.boot.output)
     from {
         ["CHANGELOG.md", "LICENSE.txt", "LICENSE-LIBRARIES.md"]
     }
-
-    dependencies {
-        include(dependency{ it.moduleGroup == project.group }) // Apache License 2.0
-    }
 }
 
-build.finalizedBy shadowJar
+build.finalizedBy bootJar
+
+configure([bootJar, initialJar]) {
+    group = 'build'
+}
 
 junitPlatform {
     filters {

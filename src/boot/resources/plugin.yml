@@ -5,5 +5,5 @@ description: PlateStack server implementation for CraftBukkit servers
 author: joserobjr
 website: http://platestack.org
 
-main: org.platestack.bukkit.server.PlateStackLoader
+main: org.platestack.bukkit.boot.PlateStackLoader
 

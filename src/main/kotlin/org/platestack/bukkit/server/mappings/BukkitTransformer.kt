@@ -22,7 +22,8 @@ import org.objectweb.asm.ClassWriter
 import org.objectweb.asm.commons.ClassRemapper
 import org.platestack.api.server.UniqueModification
 import org.platestack.api.structure.ReflectionTarget
-import org.platestack.bukkit.server.PlateStackLoader
+import org.platestack.bukkit.boot.PlateStackLoader
+import org.platestack.bukkit.scanner.*
 import org.platestack.common.plugin.loader.Transformer
 import java.io.File
 import java.io.InputStream
@@ -47,13 +48,12 @@ object BukkitTransformer: Transformer {
         val repository = File("D:\\_InteliJ\\org.platestack\\Mappings").toURI().toURL()
         val bukkitMappings = BukkitURLMappingsProvider(repository, scanner, logger)
         val srgMappings = Srg2NotchURLMappingsProvider(repository, logger)
-        mappingProvider = MappingsProvider { a,b,c ->
-            (srgMappings(a,b,c) % bukkitMappings(a,b,c)).also { mappings ->
+        mappingProvider = MappingsProvider { a, b, c ->
+            (srgMappings(a, b, c) % bukkitMappings(a, b, c)).also { mappings ->
                 Files.newBufferedWriter(Paths.get("srg-craftbukkit.srg")).use { mappings.exportSRG(it) }
             }
         }
 
-        //SimpleRemapEnvironment(mappingProvider(minecraftVersion, bukkitVersion, packageVersion))
         ClassRemapEnvironment(scanner).apply {
             apply(mappingProvider(minecraftVersion, bukkitVersion, packageVersion))
         }

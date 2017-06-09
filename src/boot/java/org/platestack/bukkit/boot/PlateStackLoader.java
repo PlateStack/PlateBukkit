@@ -14,19 +14,17 @@
  *  limitations under the License.
  */
 
-package org.platestack.bukkit.server;
+package org.platestack.bukkit.boot;
 
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.math.BigInteger;
-import java.net.JarURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -36,14 +34,14 @@ import java.nio.channels.ReadableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.security.CodeSource;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.security.ProtectionDomain;
-import java.security.cert.Certificate;
-import java.util.*;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 final public class PlateStackLoader extends JavaPlugin
@@ -105,13 +103,16 @@ final public class PlateStackLoader extends JavaPlugin
                     throw new IllegalStateException("Failed to download the ivy library, impossible to continue.");
             }
 
-            final URL ourUrl = getClass().getProtectionDomain().getCodeSource().getLocation();
-            final URL ivyUrl = ivyJarLocal.toUri().toURL();
+            final URL[] modules = Stream.of("initial", "library-loader", "main")
+                    .map(it-> "/META-INF/modules/"+it+"/")
+                    .map(it-> Objects.requireNonNull(getClass().getResource(it), "Missing the internal file: "+it))
+                    .toArray(URL[]::new);
 
-            ClassLoader classLoader = new URLClassLoader(new URL[]{
-                    ivyUrl,
-                    ourUrl,
-            }, ClassLoader.getSystemClassLoader());
+            final URL ivyUrl = ivyJarLocal.toUri().toURL();
+            ClassLoader classLoader = new URLClassLoader(
+                    new URL[]{ modules[0], modules[1], ivyUrl },
+                    getClassLoader()
+            );
 
             final Class<?> initialResolverClass = classLoader.loadClass(getClass().getPackage().getName() + ".InitialResolver");
             if(classLoader != initialResolverClass.getClassLoader())
@@ -121,161 +122,27 @@ final public class PlateStackLoader extends JavaPlugin
             final Method resolveMethod = initialResolverClass.getDeclaredMethod("resolve", JavaPlugin.class, List.class);
 
             final List<?> jars = (List<?>) resolveMethod.invoke(null, this,
-                    Arrays.asList(
-                            Objects.requireNonNull(getClass().getResourceAsStream("/org/platestack/api/libraries.list"), "api/libraries.list not found"),
-                            Objects.requireNonNull(getClass().getResourceAsStream("/org/platestack/common/libraries.list"), "common/libraries.list not found"),
-                            Objects.requireNonNull(getClass().getResourceAsStream("/org/platestack/bukkit/libraries.list"), "bukkit/libraries.list not found")
-                    )
+                    Stream.of("api", "common", "bukkit")
+                            .map(it->
+                                    Objects.requireNonNull(getClass().getResourceAsStream(
+                                            "/META-INF/modules/main/org/platestack/"+it+"/libraries.list"
+                                    ), "Missing file: "+it )
+                            ).collect(Collectors.toList())
             );
 
-            classLoader = new URLClassLoader(
-                    Stream.concat(
-                            Stream.of(ourUrl),
-                            jars.stream().map(it-> (File) it).map(file -> {
-                                try
-                                {
-                                    return file.toURI().toURL();
-                                } catch(MalformedURLException e)
-                                {
-                                    throw new RuntimeException(e);
-                                }
-                            })
-                    )
-                            //.peek(file-> getLogger().info("Using: "+file))
-                            .toArray(URL[]::new),
-                    ClassLoader.getSystemClassLoader()
-            );
-
-            final ClassLoader[] classLoaders = {classLoader, getClassLoader()};
-
-            classLoader = new ClassLoader(ClassLoader.getSystemClassLoader()) {
-                @Override
-                protected Enumeration<URL> findResources(String name) throws IOException
-                {
-                    final List<Enumeration<URL>> total = new ArrayList<>(classLoaders.length);
-                    for (ClassLoader loader : classLoaders)
+            classLoader = new RootClassLoader(this, new URL[]{modules[1], modules[2]}, getClassLoader(), jars.stream().map(it-> (File) it)
+                    .map(file ->
                     {
-                        Enumeration<URL> resources = loader.getResources(name);
-                        if(resources.hasMoreElements())
-                            total.add(resources);
-                    }
-
-                    if(total.isEmpty())
-                        return new Enumeration<URL>()
-                        {
-                            @Override
-                            public boolean hasMoreElements()
-                            {
-                                return false;
-                            }
-
-                            @Override
-                            public URL nextElement()
-                            {
-                                throw new NoSuchElementException();
-                            }
-                        };
-
-                    if(total.size() == 1)
-                        return total.get(0);
-
-                    return new Enumeration<URL>()
-                    {
-                        private Queue<Enumeration<URL>> queue = new ArrayDeque<>(total);
-
-                        @Override
-                        public boolean hasMoreElements()
-                        {
-                            return !queue.isEmpty();
-                        }
-
-                        @Override
-                        public URL nextElement()
-                        {
-                            Enumeration<URL> iter = queue.peek();
-                            URL next = iter.nextElement();
-                            if(!iter.hasMoreElements())
-                                queue.remove();
-                            return next;
-                        }
-                    };
-                }
-
-                @Override
-                protected URL findResource(String name)
-                {
-                    for (ClassLoader loader : classLoaders)
-                    {
-                        final URL resource = loader.getResource(name);
-                        if(resource != null)
-                            return resource;
-                    }
-
-                    return null;
-                }
-
-
-                @Override
-                protected Class<?> findClass(String name) throws ClassNotFoundException
-                {
-                    ClassNotFoundException exception = null;
-                    for (ClassLoader loader : classLoaders)
-                    {
-                        final URL resource = loader.getResource(name.replace('.', '/') + ".class");
-                        if(resource != null)
-                        {
-                            final byte[] classData;
-                            try(InputStream input = resource.openStream())
-                            {
-                                final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-                                int nRead;
-                                final byte[] data = new byte[16384];
-
-                                while ((nRead = input.read(data, 0, data.length)) != -1) {
-                                    buffer.write(data, 0, nRead);
-                                }
-
-                                buffer.flush();
-                                classData = buffer.toByteArray();
-                            }
-                            catch(IOException e)
-                            {
-                                e.printStackTrace();
-                                continue;
-                            }
-
-                            URL source;
-                            try
-                            {
-                                final JarURLConnection connection =
-                                        (JarURLConnection) resource.openConnection();
-                                source = connection.getJarFileURL();
-                            }
-                            catch(Exception e)
-                            {
-                                source = resource;
-                            }
-
-                            ProtectionDomain protectionDomain = new ProtectionDomain(new CodeSource(source, (Certificate[]) null), null);
-                            return defineClass(name, classData, 0, classData.length, protectionDomain);
-                        }
                         try
                         {
-                            return loader.loadClass(name);
-                        }
-                        catch(ClassNotFoundException e)
+                            return file.toURI().toURL();
+                        } catch(MalformedURLException e)
                         {
-                            if(exception == null)
-                                exception = new ClassNotFoundException(name);
-                            exception.addSuppressed(e);
+                            throw new RuntimeException(e);
                         }
-                    }
-
-                    if(exception != null)
-                        throw exception;
-                    throw new ClassNotFoundException(name);
-                }
-            };
+                    })
+                    .toArray(URL[]::new)
+            );
 
             final Class<?> plateBukkitClass = classLoader.loadClass("org.platestack.bukkit.server.PlateBukkit");
             if(classLoader != plateBukkitClass.getClassLoader())

@@ -14,7 +14,7 @@
  *  limitations under the License.
  */
 
-package org.platestack.bukkit.server.mappings
+package org.platestack.bukkit.scanner
 
 import java.io.Writer
 import java.util.*
