@@ -23,7 +23,14 @@ import org.objectweb.asm.commons.ClassRemapper
 import org.platestack.api.server.UniqueModification
 import org.platestack.api.structure.ReflectionTarget
 import org.platestack.bukkit.boot.PlateStackLoader
-import org.platestack.bukkit.scanner.*
+import org.platestack.bukkit.scanner.ClassLoaderResourceScanner
+import org.platestack.bukkit.scanner.ClassRemapEnvironment
+import org.platestack.bukkit.scanner.MappingsProvider
+import org.platestack.bukkit.scanner.mappings.Mappings
+import org.platestack.bukkit.scanner.mappings.provider.BukkitURLMappingsProvider
+import org.platestack.bukkit.scanner.mappings.provider.Srg2NotchURLMappingsProvider
+import org.platestack.bukkit.scanner.structure.ClassIdentifier
+import org.platestack.bukkit.scanner.structure.ClassStructure
 import org.platestack.common.plugin.loader.Transformer
 import java.io.File
 import java.io.InputStream

@@ -14,8 +14,13 @@
  *  limitations under the License.
  */
 
-package org.platestack.bukkit.scanner
+package org.platestack.bukkit.scanner.mappings.provider
 
+import org.platestack.bukkit.scanner.MappingsProvider
+import org.platestack.bukkit.scanner.Scanner
+import org.platestack.bukkit.scanner.filterComments
+import org.platestack.bukkit.scanner.mappings.Mappings
+import org.platestack.bukkit.scanner.structure.*
 import java.io.BufferedReader
 import java.io.InputStream
 import java.io.InputStreamReader

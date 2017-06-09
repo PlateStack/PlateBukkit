@@ -17,6 +17,7 @@
 package org.platestack.bukkit.scanner;
 
 import org.jetbrains.annotations.NotNull;
+import org.platestack.bukkit.scanner.mappings.Mappings;
 
 import java.io.IOException;
 

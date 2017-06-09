@@ -18,19 +18,18 @@ package org.platestack.bukkit.scanner
 
 import org.platestack.bukkit.scanner.structure.ClassIdentifier
 import org.platestack.bukkit.scanner.structure.ClassStructure
-import org.platestack.bukkit.scanner.structure.FieldIdentifier
-import org.platestack.bukkit.scanner.structure.MethodIdentifier
-import java.util.stream.Stream
 
-typealias ClassToken = ClassIdentifier
-typealias ClassMapping = HashMap<ClassToken, ClassToken>
+open class ClassLoaderResourceScanner(val classLoader: ClassLoader): StreamScanner() {
+    override val knownClasses = HashMap<ClassIdentifier, ClassStructure>()
 
-typealias MethodToken = Pair<ClassIdentifier, MethodIdentifier>
-typealias MethodMapping = HashMap<MethodToken, MethodToken>
+    override fun supplyClass(identifier: ClassIdentifier): ClassStructure? {
+        knownClasses[identifier]?.let { return it }
 
-typealias FieldToken = Pair<ClassIdentifier, FieldIdentifier>
-typealias FieldMapping = HashMap<FieldToken, FieldToken>
+        classLoader.getResourceAsStream(identifier.fullName+".class")?.use { input ->
+            return supplyClass(identifier, input)
+        }
 
-fun Stream<String>.filterComments() = map(String::trim).filter(String::isNotBlank).filter { !it.startsWith('#') }!!
-
-internal typealias SimpleEnv = HashMap<ClassIdentifier, ClassStructure>
+        // TODO: Why are we throwing ClassNotFoundEx if we can return null? It makes no sense.
+        throw ClassNotFoundException(identifier.fullName)
+    }
+}

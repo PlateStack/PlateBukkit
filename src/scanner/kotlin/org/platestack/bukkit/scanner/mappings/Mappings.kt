@@ -14,8 +14,13 @@
  *  limitations under the License.
  */
 
-package org.platestack.bukkit.scanner
+package org.platestack.bukkit.scanner.mappings
 
+import org.platestack.bukkit.scanner.ClassMapping
+import org.platestack.bukkit.scanner.FieldMapping
+import org.platestack.bukkit.scanner.MethodMapping
+import org.platestack.bukkit.scanner.SimpleEnv
+import org.platestack.bukkit.scanner.structure.*
 import java.io.Writer
 import java.util.*
 
