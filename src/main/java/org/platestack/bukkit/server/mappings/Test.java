@@ -16,12 +16,20 @@
 
 package org.platestack.bukkit.server.mappings;
 
+import org.platestack.bukkit.scanner.mappings.Mappings;
+import org.platestack.bukkit.scanner.mappings.provider.BukkitURLMappingsProvider;
+import org.platestack.bukkit.scanner.mappings.provider.Srg2NotchURLMappingsProvider;
 import org.platestack.bukkit.scanner.rework.HybridScanner;
 import org.platestack.bukkit.scanner.rework.RemapEnvironment;
 import org.platestack.bukkit.scanner.structure.ClassIdentifier;
 import org.platestack.bukkit.scanner.structure.ClassStructure;
 import org.platestack.bukkit.scanner.structure.FieldIdentifier;
 import org.platestack.bukkit.scanner.structure.FieldStructure;
+
+import java.io.File;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.logging.Logger;
 
 class Test
 {
@@ -38,7 +46,20 @@ class Test
         showClass(java.lang.reflect.Array.newInstance(r.getClass(), 1).getClass()); // Obtains an array class of a lambda base type.
     }
 
-    public static void main(String[] args)
+    public static void main(String[] args) throws MalformedURLException
+    {
+        URL base = new File("D:\\_InteliJ\\org.platestack\\Mappings").toURI().toURL();
+        Logger logger = Logger.getLogger("main");
+        Srg2NotchURLMappingsProvider srgProvider = new Srg2NotchURLMappingsProvider(base, logger);
+        Mappings srg = srgProvider.invoke("1.11.2", "1.11.2-R0.1-SNAPSHOT", "v1_11_R1");
+        System.out.println(srg);
+
+        BukkitURLMappingsProvider bukkitProvider = new BukkitURLMappingsProvider(base, logger, true);
+        Mappings bukkit = bukkitProvider.invoke("1.11.2", "1.11.2-R0.1-SNAPSHOT", "v1_11_R1");
+        System.out.println(bukkit);
+    }
+
+    public static void main1(String[] args)
     {
         //x(() -> {});
         RemapEnvironment env = new RemapEnvironment();

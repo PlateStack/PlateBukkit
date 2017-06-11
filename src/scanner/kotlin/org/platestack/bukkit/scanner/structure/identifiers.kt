@@ -31,7 +31,7 @@ data class FieldIdentifier(val name: String): Identifier {
     fun toChange() = FieldChange(Name(name))
 }
 
-private val validMethod = Regex("^\\((\\)V|(\\[?([BCDFIJSZ]|L[^;]+;))*\\)(V|\\[?([BCDFIJSZ]|L[^;]+;)))$")
+private val validMethod = Regex("^\\((\\)V|(\\[*([BCDFIJSZ]|L[^;]+;))*\\)(V|\\[*([BCDFIJSZ]|L[^;]+;)))$")
 //private val validMethod = Regex("^\\((\\[?([BCDFIJSZ]|L[^;]+;))*\\)(V|\\[?([BCDFIJSZ]|L[^;]+;))$")
 
 /**
@@ -100,19 +100,18 @@ data class PackageIdentifier constructor(val parent: PackageIdentifier?, val nam
  * scary/$Scala          | scary       | null                | $Scala         | So it has no normal parent class in the end
  *
  * @property package The package which this class resides
- * @property parent The class which nests this class or is referred by this class name before the actual name
+ * @property parent The class which nests this class or is referred by this class name before the actual name. The parent must have the same package as this class.
  * @property name The actual name of this class. Must contains the separation character.
  * @property fullSimpleName The combination of the parent's name with this name, excluding the package name
  * @property fullName The full name including the package and the parent name.
- *
- * If the parent's package differs then the package used by this identifier is used.
  */
 data class ClassIdentifier(val `package`: PackageIdentifier, val parent: ClassIdentifier?, val className: String): Identifier {
 
     init {
-        check(className.isNotBlank()) { "The class name can't be empty" }
-        check('.' !in className) { "Class name can't contains '.'" }
-        check('/' !in className) { "Class name can't contains '/'" }
+        require(className.isNotBlank()) { "The class name can't be empty" }
+        require('.' !in className) { "Class name can't contains '.'" }
+        require('/' !in className) { "Class name can't contains '/'" }
+        require(parent == null || parent.`package` == `package`) { "The parent class has a different package than this! This: $this ; Parent: $parent" }
     }
 
     val fullSimpleName:String = (parent?.fullSimpleName ?: "") + className

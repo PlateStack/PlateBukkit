@@ -97,7 +97,7 @@ data class ParameterDescriptor(val array: Boolean, val base: Char, val type: Cla
     override fun toString() = "$from -> $to"
 }
 
-private val signaturePattern = Regex("\\[?([BCDFIJSZ]|L[^;]+;)")
+private val signaturePattern = Regex("\\[*([BCDFIJSZ]|L[^;]+;)")
 
 /**
  * The JVM method descriptor

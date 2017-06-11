@@ -21,6 +21,7 @@ import org.platestack.bukkit.scanner.mappings.Mappings
 import org.platestack.bukkit.scanner.structure.ClassIdentifier
 import org.platestack.bukkit.scanner.structure.FieldIdentifier
 import org.platestack.bukkit.scanner.structure.MethodIdentifier
+import org.platestack.bukkit.scanner.structure.PackageIdentifier
 import java.io.Reader
 import java.net.URL
 import java.util.logging.Logger
@@ -52,8 +53,21 @@ class Srg2NotchURLMappingsProvider(val base: URL, val logger: Logger) : Mappings
                 .groupBy { it.first() }
 
         val mappings = Mappings()
-        val classes = mutableMapOf<String, ClassIdentifier>()
+        val packages = mutableMapOf<String, PackageToken>()
 
+        fun String.packageToken(): PackageToken {
+            val noDot = if(this == ".") "" else this
+            return packages.computeIfAbsent(noDot) { _ -> PackageIdentifier(noDot) }
+        }
+
+        groups["PK:"]!!.associate {
+            it[1].packageToken() to it[2].packageToken()
+        }.let {
+            logger.info { "Loaded ${it.size} fallback package mappings" }
+            mappings.packages += it
+        }
+
+        val classes = mutableMapOf<String, ClassIdentifier>()
         fun String.classToken(): ClassToken = classes.computeIfAbsent(this) { _ -> ClassIdentifier(this) }
         groups["CL:"]!!.associate {
             it[1].classToken() to it[2].classToken()

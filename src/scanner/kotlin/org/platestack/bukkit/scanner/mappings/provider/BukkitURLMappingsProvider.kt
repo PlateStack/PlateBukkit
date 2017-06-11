@@ -17,13 +17,9 @@
 package org.platestack.bukkit.scanner.mappings.provider
 
 import org.platestack.bukkit.scanner.MappingsProvider
-import org.platestack.bukkit.scanner.Scanner
 import org.platestack.bukkit.scanner.filterComments
 import org.platestack.bukkit.scanner.mappings.Mappings
-import org.platestack.bukkit.scanner.structure.ClassIdentifier
-import org.platestack.bukkit.scanner.structure.FieldIdentifier
-import org.platestack.bukkit.scanner.structure.PackageIdentifier
-import org.platestack.bukkit.scanner.structure.ParameterDescriptor
+import org.platestack.bukkit.scanner.structure.*
 import java.io.BufferedReader
 import java.io.InputStream
 import java.io.InputStreamReader
@@ -32,7 +28,7 @@ import java.util.logging.Logger
 import kotlin.streams.asSequence
 import kotlin.streams.toList
 
-class BukkitURLMappingsProvider(val base: URL, val scanner: Scanner, val logger: Logger, val checkPackageVersion: Boolean = true) : MappingsProvider {
+class BukkitURLMappingsProvider(val base: URL, val logger: Logger, val checkPackageVersion: Boolean = true) : MappingsProvider {
     fun InputStream.lines(charset: String = "UTF-8") = BufferedReader(InputStreamReader(this, charset)).lines()!!
     fun InputStream.readLine(charset: String = "UTF-8") = BufferedReader(InputStreamReader(this, charset)).readLine()!!
 
@@ -59,6 +55,7 @@ class BukkitURLMappingsProvider(val base: URL, val scanner: Scanner, val logger:
          * aaaa -> net/minecraft/server/v5/NiceName
          */
         val mappings = Mappings()
+        mappings.packages[PackageIdentifier("")] = PackageIdentifier("net/minecraft/server/$packageVersion")
 
         logger.info { "Loading bukkit class name definitions from remote" }
         URL(dir, "bukkit-$minecraftVersion-cl.csrg").openStream().use {
@@ -77,12 +74,20 @@ class BukkitURLMappingsProvider(val base: URL, val scanner: Scanner, val logger:
                     .asSequence().partition { it.size == 3 }
         }
 
+        val emptyPackage = PackageIdentifier(null, "")
+
+        fun ClassIdentifier.toNoPackage(): ClassIdentifier {
+            if(`package` == emptyPackage)
+                return this
+            else
+                return ClassIdentifier(emptyPackage, parent?.toNoPackage(), className)
+        }
+
         /**
          * NiceName -> net/minecraft/server/v5/NiceName
          */
-        val emptyPackage = PackageIdentifier(null, "")
         val fromNoPackage = Mappings().also {
-            it.classes += mappings.classes.map { it.value.let { ClassIdentifier(emptyPackage, it.parent, it.className) } to it.value }
+            it.classes += mappings.classes.map { it.value.let { it.toNoPackage() to it } }
         }
 
         fun ParameterDescriptor.isolated() : ParameterDescriptor = TODO()
@@ -126,40 +131,42 @@ class BukkitURLMappingsProvider(val base: URL, val scanner: Scanner, val logger:
                 if(it) logger.severe("Found a field with '(' char in it!: $c $from $to")
             }
         }.asSequence().mapNotNull { (className, fromFieldName, toFieldName) ->
-            val line = "$className $fromFieldName $toFieldName"
             val classId = remapOrRegisterNoPackage(ClassIdentifier(className))
 
-            // Technically, we don't need to verify the class anymore since the field descriptor have been dropped from the identifier
-            val classStructure = scanner.supplyClass(classId) ?: error("The structure scanned couldn't find $classId to map $line")
-            val targetField = classStructure.fields.keys.find { it.name == toFieldName }
-                    ?: "Field $toFieldName not found while mapping $line".let { logger.severe(it); return@mapNotNull null }
-            val from = FieldIdentifier(fromFieldName)
-
-            (inverse.classes[classId]!! to from) to (classId to targetField)
+            (inverse.classes[classId]!! to FieldIdentifier(fromFieldName)) to (classId to FieldIdentifier(toFieldName))
         }.toMap().let {
             logger.info { "Loaded ${it.size} field name mappings" }
             mappings.fields += it
         }
-        TODO()
-    /*
+
         methodList.associate { (className, fromMethodName, noPackageSignature, toMethodName) ->
             val line = "$className $fromMethodName $noPackageSignature $toMethodName"
             val classId = remapOrRegisterNoPackage(ClassIdentifier(className)) //fromNoPackage.classes[ClassIdentifier(className)] ?: error("Unknown class while mapping $line")
-            val methodSignature = MethodDescriptor(noPackageSignature) {
-                scanner.supplyClass(
-                        remapOrRegisterNoPackage(it)
-                )?.`class` ?: error("No class found to remap the descriptor of $className$noPackageSignature . Mapping: $line")
+            val methodSignature = MethodDescriptor(noPackageSignature) { from->
+                val to = remapOrRegisterNoPackage(from)
+                if(from == to) {
+                    to.toChange()
+                }
+                else {
+                    from.toChange({
+                        PackageMove(from.`package`.toChange(), to.`package`.toChange())
+                    }).also {
+                        it.`package`.new = to.`package`.toChange()
+                    }
+                }
             }
 
             val newMethod = MethodIdentifier(toMethodName, methodSignature.to)
 
+            /*
             val inverseSignature = methodSignature.run {
                 MethodDescriptor(returnType.isolated(), parameterTypes.map { it.isolated() }).apply {
                     apply(inverse)
                 }
             }
+            */
 
-            val oldMethod = MethodIdentifier(fromMethodName, inverseSignature.to)
+            val oldMethod = MethodIdentifier(fromMethodName, methodSignature.to)
 
 
             (inverse.classes[classId]!! to oldMethod) to (classId to newMethod)
@@ -167,7 +174,7 @@ class BukkitURLMappingsProvider(val base: URL, val scanner: Scanner, val logger:
             logger.info { "Loaded ${it.size} method name mappings" }
             mappings.methods += it
         }
-    */
+
         return mappings
     }
 }

@@ -16,15 +16,13 @@
 
 package org.platestack.bukkit.scanner.mappings
 
-import org.platestack.bukkit.scanner.ClassMapping
-import org.platestack.bukkit.scanner.FieldMapping
-import org.platestack.bukkit.scanner.MethodMapping
-import org.platestack.bukkit.scanner.SimpleEnv
+import org.platestack.bukkit.scanner.*
 import org.platestack.bukkit.scanner.structure.PackageIdentifier
 import java.io.Writer
 import java.util.*
 
 class Mappings {
+    val packages = PackageMapping()
     val classes = ClassMapping()
     val methods = MethodMapping()
     val fields = FieldMapping()
@@ -39,6 +37,7 @@ class Mappings {
                     if (value.size == 1) value.first().second
                     else value.maxBy { (_, alt) -> classes.keys.count { it.`package` == alt } }!!.second
                 }
+                .apply { putAll(packages) }
                 .forEach { (from, to) ->
                     writer.write("PK: ${from.toSRG()} ${to.toSRG()}\n")
                 }
@@ -81,6 +80,7 @@ class Mappings {
     }
 
     fun inverse() = Mappings().also {
+        it.packages += packages.inverse()
         it.classes += classes.inverse()
         it.methods += methods.inverse()
         it.fields += fields.inverse()

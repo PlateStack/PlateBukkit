@@ -26,16 +26,12 @@ import org.platestack.bukkit.scanner.ClassLoaderResourceScanner
 import org.platestack.bukkit.scanner.ClassRemapEnvironment
 import org.platestack.bukkit.scanner.MappingsProvider
 import org.platestack.bukkit.scanner.mappings.Mappings
-import org.platestack.bukkit.scanner.mappings.provider.BukkitURLMappingsProvider
-import org.platestack.bukkit.scanner.mappings.provider.Srg2NotchURLMappingsProvider
 import org.platestack.bukkit.scanner.structure.ClassIdentifier
 import org.platestack.bukkit.scanner.structure.ClassStructure
 import org.platestack.common.plugin.loader.Transformer
 import org.platestack.util.UniqueModification
 import java.io.File
 import java.io.InputStream
-import java.nio.file.Files
-import java.nio.file.Paths
 import java.util.logging.Level
 import java.util.logging.Logger
 
@@ -45,7 +41,7 @@ object BukkitTransformer: Transformer {
 
     private lateinit var classLoader: ClassLoader
     private var logger by UniqueModification<Logger>()
-    private val env by lazy {
+    private val env: ClassRemapEnvironment by lazy {
         logger.info("Computing the mappings: SRG -> Notch -> CraftBukkit")
         val minecraftVersion = Bukkit.getVersion().split("(MC:", ")")[1].trim()
         val bukkitVersion = Bukkit.getBukkitVersion()
@@ -53,6 +49,8 @@ object BukkitTransformer: Transformer {
         logger.info("Minecraft: $minecraftVersion Bukkit: $bukkitVersion Package: $packageVersion")
         //TODO remove this line
         val repository = File("D:\\_InteliJ\\org.platestack\\Mappings").toURI().toURL()
+        TODO()
+        /*
         val bukkitMappings = BukkitURLMappingsProvider(repository, scanner, logger)
         val srgMappings = Srg2NotchURLMappingsProvider(repository, logger)
         mappingProvider = MappingsProvider { a, b, c ->
@@ -64,6 +62,7 @@ object BukkitTransformer: Transformer {
         ClassRemapEnvironment(scanner).apply {
             apply(mappingProvider(minecraftVersion, bukkitVersion, packageVersion))
         }
+        */
     }
 
     private var sourceClassLoader: ClassLoader? = null
