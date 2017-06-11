@@ -86,14 +86,15 @@ sourceSets {
 dependencies {
     compileBoot 'org.bukkit:bukkit:1.12-pre5-SNAPSHOT'
 
+    compileInitial sourceSets.boot.output
+    compileInitial project(':library-loader')
+
     compileScanner sourceSets.boot.output
+    compileScanner project(path: ':plate-api', configuration: 'util')
     compileScanner "org.jetbrains.kotlin:kotlin-stdlib-jre8:$kotlin_version"
     compileScanner "org.jetbrains.kotlin:kotlin-reflect:$kotlin_version"
     compileScanner 'org.ow2.asm:asm-tree:5.2'
     compileScanner 'org.ow2.asm:asm-commons:5.2'
-
-    compileInitial sourceSets.boot.output
-    compileInitial project(':library-loader')
 
     compile sourceSets.scanner.output
     compile project(':plate-common')
@@ -134,6 +135,10 @@ task bootJar(type: Jar, dependsOn: [':initialClasses', ':classes', ':plate-commo
             from { project(':plate-api:immutable-collections').sourceSets.main.output }
             from { project(':plate-common').sourceSets.main.output }
             from { project(':plate-api').sourceSets.main.output }
+        }
+
+        into('util') {
+            from { project(path: ':plate-api').sourceSets.util.output }
         }
     }
 

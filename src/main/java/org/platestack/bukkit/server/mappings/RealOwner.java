@@ -14,22 +14,11 @@
  *  limitations under the License.
  */
 
-package org.platestack.bukkit.scanner
+package org.platestack.bukkit.server.mappings;
 
-import kotlin.reflect.KProperty
+public class RealOwner extends Root
+{
+    public String requestedField;
 
-//TODO This is a copy of the one provided by plate-api, find a way to use that instead
-internal class UniqueModification<V: Any> {
-
-    private var field: V? = null
-
-    operator fun getValue(thisRef: Any?, property: KProperty<*>): V {
-        return field ?: throw UninitializedPropertyAccessException("No value has been set to ${property.name} yet")
-    }
-    operator fun setValue(thisRef: Any?, property: KProperty<*>, value: V) {
-        if(field != null)
-            error("The value can be modified only one time.")
-
-        this.field = value
-    }
+    RealOwner() { super(); }
 }

@@ -16,9 +16,8 @@
 
 package org.platestack.bukkit.scanner.structure
 
-import org.platestack.bukkit.scanner.UniqueModification
-import org.platestack.bukkit.scanner.mappings.Mappings
 import java.lang.reflect.Modifier
+import kotlin.concurrent.getOrSet
 
 enum class AccessLevel {
     PRIVATE, INTERNAL, PROTECTED, PUBLIC, UNKNOWN;
@@ -43,39 +42,79 @@ interface ClassScoped {
     fun canBeAccessedBy(`class`: ClassStructure) = true
 }
 
-data class MethodStructure(val method: MethodChange, override val owner: ClassChange, override var access: AccessLevel) : ClassScoped {
-    fun apply(mappings: Mappings) {
-        method.apply(mappings, mappings.methods[owner.from to method.from]?.also {
-            owner.name.reverse = it.first.className
-            owner.`package`.name.reverse = it.first.`package`.fullName
-        })
-    }
+data class MethodStructure(val method: MethodChange, override val owner: ClassChange, override var access: AccessLevel, var isStatic: Boolean?) : ClassScoped {
+    override fun toString() = "${owner.from}#${method.from} -> ${owner.to}#${method.to}"
 }
 
-data class FieldStructure(val field: FieldChange, override val owner: ClassChange, override var access: AccessLevel, val signature: SignatureType) : ClassScoped {
-    fun apply(mappings: Mappings) {
-        field.apply(mappings.fields[owner.from to field.from]?.also {
-            owner.name.reverse = it.first.className
-            owner.`package`.name.reverse = it.first.`package`.fullName
-        })
-    }
+data class FieldStructure(val field: FieldChange, override val owner: ClassChange, override var access: AccessLevel, var static: Boolean?, val descriptor: ParameterDescriptor) : ClassScoped {
+    override fun toString() = "${owner.from}#${field.from} -> ${owner.to}#${field.to}"
 }
 
-class ClassStructure(`class`: ClassChange?, var `super`: ClassStructure?, val interfaces: List<ClassStructure>) {
-    var `class` by UniqueModification<ClassChange>()
+class ClassStructure private constructor(var isInterface: Boolean?, val interfaces: Set<ClassStructure>) {
+    lateinit var `class`: ClassChange; private set
+    var `super`: ClassStructure? = null; private set
 
-    init {
-        if(`class` != null)
-            this.`class` = `class`
+    val fields: MutableMap<FieldIdentifier, FieldStructure> = mutableMapOf() //HashMap()
+    val methods: MutableMap<MethodIdentifier, MethodStructure> = HashMap()
+    var isFull = false
+
+    constructor(`class`: ClassChange, `super`: ClassStructure?, isInterface: Boolean?, interfaces: Set<ClassStructure>): this(isInterface, interfaces) {
+        this.`class` = `class`
+        this.`super` = `super`
     }
 
-    val fields = HashMap<FieldIdentifier, FieldStructure>()
-    val methods = HashMap<MethodIdentifier, MethodStructure>()
+    companion object {
+        private val lock = ThreadLocal<MutableMap<ClassIdentifier, ClassStructure>>()
+        operator fun invoke(
+                id: ClassIdentifier, `super`: ClassIdentifier?, isInterface: Boolean?, interfaces: Set<ClassIdentifier>,
+                packageProvider: ((PackageIdentifier) -> PackageMove)? = null,
+                parentProvider: ((ClassIdentifier) -> ClassMove?)? = null,
+                structureProvider: (ClassIdentifier) -> ClassStructure
+        ): ClassStructure {
+            synchronized(lock) {
+                val loading = lock.getOrSet(::mutableMapOf)
+                loading[id]?.let {
+                    System.err.println("Cyclic structure creation from: $loading to $id")
+                    return it
+                }
 
-    fun apply(mappings: Mappings) {
-        `class`.apply(mappings)
-        fields.values.forEach{ it.apply(mappings) }
-        methods.values.forEach{ it.apply(mappings) }
+                val loadingInterfaces = mutableSetOf<ClassStructure>()
+                val structure = ClassStructure(isInterface, loadingInterfaces)
+                check(loading.put(id, structure) == null) {
+                    "Expected $id to be outside of the loading map"
+                }
+
+                try {
+                    fun ClassIdentifier.create() =
+                            if(packageProvider != null) {
+                                if(parentProvider != null) {
+                                    toChange(packageProvider, parentProvider)
+                                }
+                                else {
+                                    toChange(packageProvider)
+                                }
+                            }
+                            else {
+                                if(parentProvider != null) {
+                                    toChange(parentProvider = parentProvider)
+                                }
+                                else {
+                                    toChange()
+                                }
+                            }
+
+                    structure.`class` = id.create()
+                    structure.`super` = `super`?.let(structureProvider)
+                    loadingInterfaces.addAll(interfaces.map { structureProvider(it) })
+                    return structure
+                }
+                finally {
+                    checkNotNull(loading.remove(id)) {
+                        "Expected $id to be on the loading map"
+                    }
+                }
+            }
+        }
     }
 
     fun find(method: MethodIdentifier, viewer: ClassStructure): MethodStructure? =
@@ -139,4 +178,10 @@ class ClassStructure(`class`: ClassChange?, var `super`: ClassStructure?, val in
             = methods[method] ?: methods.values.find { it.method.to == method }
             ?: `super`?.findReverse(method, this)
             ?: interfaces.asSequence().mapNotNull { it.findReverse(method, this) }.firstOrNull()
+
+    override fun toString() = when(isInterface) {
+        true -> "interface ";
+        false -> "class "
+        null-> "unknown "
+    } + `class`.toString() + if(isFull) " (full)" else " (partial)"
 }

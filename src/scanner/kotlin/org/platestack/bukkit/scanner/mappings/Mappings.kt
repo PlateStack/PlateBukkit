@@ -20,7 +20,7 @@ import org.platestack.bukkit.scanner.ClassMapping
 import org.platestack.bukkit.scanner.FieldMapping
 import org.platestack.bukkit.scanner.MethodMapping
 import org.platestack.bukkit.scanner.SimpleEnv
-import org.platestack.bukkit.scanner.structure.*
+import org.platestack.bukkit.scanner.structure.PackageIdentifier
 import java.io.Writer
 import java.util.*
 
@@ -51,8 +51,8 @@ class Mappings {
             writer.write("FD: ${from.first}/${from.second.name} ${to.first}/${to.second}\n")
         }
 
-        methods.asSequence().sortedWith(compareBy({ it.key.first.fullName }, { it.key.second.name }, { it.key.second.signature })).forEach { (from, to) ->
-            writer.write("MD: ${from.first}/${from.second.name} ${from.second.signature} ${to.first}/${to.second.name} ${to.second.signature}\n")
+        methods.asSequence().sortedWith(compareBy({ it.key.first.fullName }, { it.key.second.name }, { it.key.second.descriptor })).forEach { (from, to) ->
+            writer.write("MD: ${from.first}/${from.second.name} ${from.second.descriptor} ${to.first}/${to.second.name} ${to.second.descriptor}\n")
         }
     }
 
@@ -88,7 +88,7 @@ class Mappings {
 
     fun toKnownStructure(): SimpleEnv {
         val structures = SimpleEnv()
-
+        /*
         fun ClassIdentifier.toStructure(): ClassStructure {
             structures[this]?.let { return it }
             ClassStructure(toChange { it.toStructure().`class` }, null, emptyList()).let {
@@ -101,14 +101,14 @@ class Mappings {
             val structure = from.toStructure()
             structure.`class`.`package`.name.reverse = to.`package`.toChange().name.current
             structure.`class`.`package`.checkReverse()
-            structure.`class`.name.reverse = to.className
+            structure.`class`.name.to = to.className
         }
 
         fields.forEach { (fromClass, fromField), (_, toField) ->
             val structure = fromClass.toStructure()
             val fieldChange = fromField.toChange()
             fieldChange.name.reverse = toField.name
-            structure.fields[fromField] = FieldStructure(fieldChange, structure.`class`, AccessLevel.UNKNOWN, SignatureType(false, 'V', null))
+            structure.fields[fromField] = FieldStructure(fieldChange, structure.`class`, AccessLevel.UNKNOWN, ParameterDescriptor(false, 'V', null))
         }
 
         methods.forEach { (fromClass, fromMethod), (_, toMethod) ->
@@ -117,17 +117,19 @@ class Mappings {
             methodChange.name.reverse = toMethod.name
             structure.methods[fromMethod] = MethodStructure(methodChange, structure.`class`, AccessLevel.UNKNOWN)
         }
-
+        */
+        TODO()
         return structures
     }
 
     fun bridge(mappings: Mappings, revertMissingClasses: Boolean = false, revertMissingFields: Boolean = false, reverMissingMethods: Boolean = false): Mappings {
         val structures = toKnownStructure()
-
+        TODO()
+        /*
         classes.forEach { from, to ->
             val next = mappings.classes[to] ?: if(revertMissingClasses) from else to
             structures[from]!!.`class`.let {
-                it.name.reverse = next.className
+                it.name.to = next.className
                 it.`package`.name.reverse = next.`package`.toChange().to.fullName
                 it.`package`.checkReverse()
             }
@@ -135,14 +137,14 @@ class Mappings {
 
         fields.forEach { (fromClass, fromField), to ->
             val next = mappings.fields[to]?.second ?: if(revertMissingFields) fromField else to.second
-            structures[fromClass]!!.fields[fromField]!!.field.name.reverse = next.name
+            structures[fromClass]!!.fields[fromField]!!.field.name.to = next.name
         }
 
         methods.forEach { (fromClass, fromMethod), to ->
             val next = mappings.methods[to]?.second ?: if(reverMissingMethods) fromMethod else to.second
-            structures[fromClass]!!.methods[fromMethod]!!.method.name.reverse = next.name
+            structures[fromClass]!!.methods[fromMethod]!!.method.name.to = next.name
         }
-
+        */
         return structures.toMappings()
     }
 
@@ -185,7 +187,8 @@ class Mappings {
 
     operator fun plus(mappings: Mappings) : Mappings {
         val structure = toKnownStructure()
-        structure.values.forEach { it.apply(mappings) }
+        TODO()
+        //structure.values.forEach { it.apply(mappings) }
         return structure.toMappings()
     }
 }

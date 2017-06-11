@@ -16,59 +16,84 @@
 
 package org.platestack.bukkit.scanner.structure
 
-import org.platestack.bukkit.scanner.FieldToken
-import org.platestack.bukkit.scanner.MethodToken
-import org.platestack.bukkit.scanner.mappings.Mappings
-
-data class FieldChange(val name: Name) {
-    val from = FieldIdentifier(name.current)
-    val to get() = FieldIdentifier(name.reverse)
-
-    fun apply(new: FieldToken?) {
-        new?.let { name.reverse = new.second.name }
-    }
+interface Change {
+    val from: Any
+    val to: Any
 }
 
-data class MethodChange(val name: Name, val signatureType: MethodSignature) {
-    val from = MethodIdentifier(name.current, signatureType.from)
-    val to get() = MethodIdentifier(name.reverse, signatureType.to)
-
-    fun apply(mappings: Mappings, new: MethodToken?) {
-        signatureType.apply(mappings)
-        new?.let { name.reverse = new.second.name }
-    }
+/**
+ * A field name
+ */
+data class FieldChange(val name: Name): Change {
+    override val from = FieldIdentifier(name.from)
+    override val to get() = FieldIdentifier(name.to)
+    override fun toString() = "$from -> $to"
 }
 
-data class PackageChange(val name: Name) {
-    val from = PackageIdentifier(name.current)
-    val to get() = PackageIdentifier(name.reverse)
-
-    init {
-        check(!name.current.endsWith('/')) { "Package name can't end with '/'" }
-        checkReverse()
-    }
-
-    fun checkReverse() {
-        check(!name.reverse.endsWith('/')) { "Package name can't end with '/'" }
-    }
+/**
+ * A method name and its descriptor
+ */
+data class MethodChange(val name: Name, val descriptorType: MethodDescriptor) : Change {
+    override val from = MethodIdentifier(name.from, descriptorType.from)
+    override val to get() = MethodIdentifier(name.to, descriptorType.to)
+    override fun toString() = "$from -> $to"
 }
 
-data class ClassChange(val `package`: PackageChange, var parent: ClassChange?, val name: Name) {
-    val from: ClassIdentifier = ClassIdentifier(`package`.from, parent?.from, name.current)
-    val to: ClassIdentifier get() = ClassIdentifier(`package`.to, parent?.to, name.reverse)
+/**
+ * A package name
+ * @property package The parent where this class resides
+ * @property name The actual name of this package. Must contains not contains any separation character!
+ */
+data class PackageChange(val parent: PackageChange?, var moveTo: PackageChange?, val name: PackageName) : Change {
+    override val from: PackageIdentifier = PackageIdentifier(parent?.from, name.from)
+    override val to: PackageIdentifier get() = PackageIdentifier(moveTo?.to, name.to)
+    override fun toString() = "$from -> $to"
+}
 
-    fun apply(mappings: Mappings) {
-        mappings.classes[from]?.also { new ->
-            name.reverse = new.className
-            `package`.name.reverse = new.`package`.fullName
-            `package`.checkReverse()
-        }
-    }
+/**
+ * A migration from a location to an other
+ */
+interface Move {
+    /**
+     * The old location
+     */
+    val old: Change?
 
-    fun deepCopy(`package`: PackageChange = PackageChange(Name(this.`package`.name.current, this.`package`.name.reverse))) : ClassChange =
-            ClassChange(
-                    `package`,
-                    parent?.deepCopy(`package`),
-                    Name(name.current, name.reverse)
-            )
+    /**
+     * The new location
+     */
+    val new: Change?
+
+    val from: Identifier?
+    val to: Identifier?
+}
+
+/**
+ * A migration from one package to another
+ */
+data class PackageMove(override val old: PackageChange, override var new: PackageChange = old) : Move {
+    override val from get() = old.from
+    override val to get() = new.to
+    override fun toString() = "$from -> $to"
+}
+
+/**
+ * A migration from a class to an other
+ */
+data class ClassMove(override val old: ClassChange?, override var new: ClassChange? = old) : Move {
+    override val from get() = old?.from
+    override val to get() = new?.to
+    override fun toString() = "$from -> $to"
+}
+
+/**
+ * A full class name
+ * @property package The package where this class resides
+ * @property parent The class which nests this class or is referred by this class name before the actual name
+ * @property name The actual name of this class. Must contains the separation character.
+ */
+data class ClassChange(val `package`: PackageMove, var parent: ClassMove, val name: ClassName) : Change {
+    override val from: ClassIdentifier = ClassIdentifier(`package`.from, parent.from, name.from)
+    override val to: ClassIdentifier get() = ClassIdentifier(`package`.to, parent.to, name.to)
+    override fun toString() = "$from -> $to"
 }

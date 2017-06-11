@@ -20,7 +20,8 @@ import org.platestack.bukkit.scanner.structure.*
 
 interface Scanner {
     fun supplyClassChange(identifier: ClassIdentifier): ClassChange {
-        return supplyClass(identifier)?.`class` ?: ClassStructure(identifier.toChange(classSupplier = this::supplyClassChange), null, emptyList()).`class` //throw ClassNotFoundException(identifier.fullName)
+        TODO()
+        //return supplyClass(identifier)?.`class` ?: ClassStructure(identifier.toChange(classSupplier = this::supplyClassChange), null, emptyList()).`class` //throw ClassNotFoundException(identifier.fullName)
     }
 
     fun supplyClass(identifier: ClassIdentifier): ClassStructure? = null

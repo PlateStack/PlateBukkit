@@ -16,11 +16,11 @@
 
 package org.platestack.bukkit.scanner
 
-import org.platestack.bukkit.scanner.structure.ClassIdentifier
-import org.platestack.bukkit.scanner.structure.ClassStructure
-import org.platestack.bukkit.scanner.structure.FieldIdentifier
-import org.platestack.bukkit.scanner.structure.MethodIdentifier
+import org.platestack.bukkit.scanner.structure.*
 import java.util.stream.Stream
+
+typealias PackageToken = PackageIdentifier
+typealias PackageMapping = HashMap<PackageToken, PackageToken>
 
 typealias ClassToken = ClassIdentifier
 typealias ClassMapping = HashMap<ClassToken, ClassToken>

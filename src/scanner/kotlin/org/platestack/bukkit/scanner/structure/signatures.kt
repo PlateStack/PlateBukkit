@@ -16,36 +16,118 @@
 
 package org.platestack.bukkit.scanner.structure
 
-import org.platestack.bukkit.scanner.mappings.Mappings
+private fun checkNotEmpty(name: String) = check(name.isNotBlank()) { "A name can't be blank" }
 
-data class Name(val current: String, var reverse: String = current)
-data class SignatureType(val array: Boolean, val descriptor: Char, val type: ClassChange?) {
+class ClassName(from: String, to: String = from): Name(from, to, {
+    require('.' !in it) { "A class name can't contains '.': $it" }
+    require('/' !in it) { "A class name can't contains '/': $it" }
+})
+
+class PackageName(from: String, to: String = from): Name(from, to, {
+    require('.' !in it) { "A class name can't contains '.': $it" }
+    require('/' !in it) { "A class name can't contains '/': $it" }
+})
+
+/**
+ * A general name which cannot be empty
+ * @property from The original name
+ * @property to The name after the transformation
+ */
+open class Name protected constructor(override final val from: String, to: String, val validator: (String)->Unit) : Change {
+    constructor(from: String, to: String = from): this(from, to, ::checkNotEmpty)
+    init {
+        validator(from)
+    }
+
+    override final var to = to; set(value) {
+        validator(value)
+        field = value
+    }
+
+    fun component1() = from
+    fun component2() = to
+    fun copy(from: String = this.from, to: String = this.to) = Name(from, to)
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other?.javaClass != javaClass) return false
+
+        other as Name
+
+        if (from != other.from) return false
+        if (to != other.to) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = from.hashCode()
+        result = 31 * result + to.hashCode()
+        return result
+    }
+
+    override fun toString(): String {
+        return "$from -> $to"
+    }
+}
+
+/**
+ * The JVM descriptor which indicates a field or parameter type
+ * @property array If this descriptor begins with `[`
+ * @property base The primitive field type: `BCDFIJSZ` or `L` for object types.
+ * @property type The object type represented by this descriptor.
+ * @property from The original descriptor
+ * @property to The descriptor after the transformation
+ */
+data class ParameterDescriptor(val array: Boolean, val base: Char, val type: ClassChange?) : Change {
     constructor(signature: String, classSupplier: (ClassIdentifier) -> ClassChange): this(StringBuilder(signature), classSupplier)
     private constructor(b: StringBuilder, classSupplier: (ClassIdentifier) -> ClassChange)
             : this(
             if(b.first() == '[') { b.deleteCharAt(0); true } else false,
             b.first(), b.first().let { if(it == 'L') classSupplier(ClassIdentifier(b.substring(1, b.length - 1))) else null }
     )
-    val from = if(array) "[" else {""} + descriptor + (type?.from?.fullName?.let { it+';' } ?: "")
-    val to get() = if(array) "[" else {""} + descriptor + (type?.to?.fullName?.let { it+';' } ?: "")
 
-    fun apply(mappings: Mappings) {
-        type?.let { type.apply(mappings) }
+    init {
+        check(base in "BCDFIJSZL") { "Unexpected primitive type: $base" }
+        check((type == null && base != 'L') || (base == 'L' && type != null)) { "Object types must declare the base to 'L' and the referred type." }
     }
+
+    override val from = if(array) "[" else {""} + base + (type?.from?.fullName?.let { it+';' } ?: "")
+    override val to get() = if(array) "[" else {""} + base + (type?.to?.fullName?.let { it+';' } ?: "")
+    override fun toString() = "$from -> $to"
 }
 
-private val signaturePattern = Regex("\\[?([BCDFIJSZV]|L[^;]+;)")
-data class MethodSignature(val returnType: SignatureType, val parameterTypes: List<SignatureType>) {
+private val signaturePattern = Regex("\\[?([BCDFIJSZ]|L[^;]+;)")
+
+/**
+ * The JVM method descriptor
+ * @property returnType The type of the object returned by the represented function. `null` indicates `V` *(`void`)*
+ * @property parameterTypes The list of parameters required by the represented method.
+ * @property from The original descriptor
+ * @property to The descriptor after the transformation
+ */
+data class MethodDescriptor(val returnType: ParameterDescriptor?, val parameterTypes: List<ParameterDescriptor>) : Change {
     constructor(signature: String, classSupplier: (ClassIdentifier)-> ClassChange)
             : this(
-            SignatureType(signature.substringAfterLast(')'), classSupplier),
-            signaturePattern.findAll(signature.substringBeforeLast(')').substring(1)).map { SignatureType(it.value, classSupplier) }.toList()
-    )
-    val from = '('+parameterTypes.asSequence().map { it.from }.joinToString("")+')'+returnType.from
-    val to get() = '('+parameterTypes.asSequence().map { it.to }.joinToString("")+')'+returnType.to
+                    if("()V" == signature)  null
+                    else signature.substringAfterLast(')').let {
+                        if(it == "V") null
+                        else ParameterDescriptor(it, classSupplier)
+                    },
 
-    fun apply(mappings: Mappings) {
-        returnType.apply(mappings)
-        parameterTypes.forEach { it.apply(mappings) }
-    }
+                    if("()V" == signature || signature.startsWith("()")) emptyList()
+                    else signaturePattern.findAll(signature.substringBeforeLast(')').substring(1))
+                            .map { ParameterDescriptor(it.value, classSupplier) }
+                            .toList()
+
+    )
+    override val from =
+            if(returnType == null && parameterTypes.isEmpty()) "()V"
+            else '('+parameterTypes.asSequence().map { it.from }.joinToString("")+')'+(returnType?.from ?: 'V')
+
+    override val to get() =
+            if(returnType == null && parameterTypes.isEmpty()) "()V"
+            else '('+parameterTypes.asSequence().map { it.to }.joinToString("")+')'+(returnType?.to ?: 'V')
+
+    override fun toString() = "$from -> $to"
 }

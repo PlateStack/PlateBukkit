@@ -20,7 +20,10 @@ import org.platestack.bukkit.scanner.MappingsProvider
 import org.platestack.bukkit.scanner.Scanner
 import org.platestack.bukkit.scanner.filterComments
 import org.platestack.bukkit.scanner.mappings.Mappings
-import org.platestack.bukkit.scanner.structure.*
+import org.platestack.bukkit.scanner.structure.ClassIdentifier
+import org.platestack.bukkit.scanner.structure.FieldIdentifier
+import org.platestack.bukkit.scanner.structure.PackageIdentifier
+import org.platestack.bukkit.scanner.structure.ParameterDescriptor
 import java.io.BufferedReader
 import java.io.InputStream
 import java.io.InputStreamReader
@@ -82,9 +85,9 @@ class BukkitURLMappingsProvider(val base: URL, val scanner: Scanner, val logger:
             it.classes += mappings.classes.map { it.value.let { ClassIdentifier(emptyPackage, it.parent, it.className) } to it.value }
         }
 
-        fun SignatureType.isolated() =
-                if(type == null) this
-                else copy(type = type!!.deepCopy())
+        fun ParameterDescriptor.isolated() : ParameterDescriptor = TODO()
+                //if(type == null) this
+                //else copy(type = type!!.deepCopy())
 
         /**
          * net/minecraft/server/v5/NiceName -> aaaa
@@ -126,7 +129,7 @@ class BukkitURLMappingsProvider(val base: URL, val scanner: Scanner, val logger:
             val line = "$className $fromFieldName $toFieldName"
             val classId = remapOrRegisterNoPackage(ClassIdentifier(className))
 
-            // Technically, we don't need to verify the class anymore since the field signature have been dropped from the identifier
+            // Technically, we don't need to verify the class anymore since the field descriptor have been dropped from the identifier
             val classStructure = scanner.supplyClass(classId) ?: error("The structure scanned couldn't find $classId to map $line")
             val targetField = classStructure.fields.keys.find { it.name == toFieldName }
                     ?: "Field $toFieldName not found while mapping $line".let { logger.severe(it); return@mapNotNull null }
@@ -137,20 +140,21 @@ class BukkitURLMappingsProvider(val base: URL, val scanner: Scanner, val logger:
             logger.info { "Loaded ${it.size} field name mappings" }
             mappings.fields += it
         }
-
+        TODO()
+    /*
         methodList.associate { (className, fromMethodName, noPackageSignature, toMethodName) ->
             val line = "$className $fromMethodName $noPackageSignature $toMethodName"
             val classId = remapOrRegisterNoPackage(ClassIdentifier(className)) //fromNoPackage.classes[ClassIdentifier(className)] ?: error("Unknown class while mapping $line")
-            val methodSignature = MethodSignature(noPackageSignature) {
+            val methodSignature = MethodDescriptor(noPackageSignature) {
                 scanner.supplyClass(
                         remapOrRegisterNoPackage(it)
-                )?.`class` ?: error("No class found to remap the signature of $className$noPackageSignature . Mapping: $line")
+                )?.`class` ?: error("No class found to remap the descriptor of $className$noPackageSignature . Mapping: $line")
             }
 
             val newMethod = MethodIdentifier(toMethodName, methodSignature.to)
 
             val inverseSignature = methodSignature.run {
-                MethodSignature(returnType.isolated(), parameterTypes.map { it.isolated() }).apply {
+                MethodDescriptor(returnType.isolated(), parameterTypes.map { it.isolated() }).apply {
                     apply(inverse)
                 }
             }
@@ -163,7 +167,7 @@ class BukkitURLMappingsProvider(val base: URL, val scanner: Scanner, val logger:
             logger.info { "Loaded ${it.size} method name mappings" }
             mappings.methods += it
         }
-
+    */
         return mappings
     }
 }

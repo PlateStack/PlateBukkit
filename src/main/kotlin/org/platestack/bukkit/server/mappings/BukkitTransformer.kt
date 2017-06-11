@@ -20,7 +20,6 @@ import org.bukkit.Bukkit
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.ClassWriter
 import org.objectweb.asm.commons.ClassRemapper
-import org.platestack.api.server.UniqueModification
 import org.platestack.api.structure.ReflectionTarget
 import org.platestack.bukkit.boot.PlateStackLoader
 import org.platestack.bukkit.scanner.ClassLoaderResourceScanner
@@ -32,6 +31,7 @@ import org.platestack.bukkit.scanner.mappings.provider.Srg2NotchURLMappingsProvi
 import org.platestack.bukkit.scanner.structure.ClassIdentifier
 import org.platestack.bukkit.scanner.structure.ClassStructure
 import org.platestack.common.plugin.loader.Transformer
+import org.platestack.util.UniqueModification
 import java.io.File
 import java.io.InputStream
 import java.nio.file.Files

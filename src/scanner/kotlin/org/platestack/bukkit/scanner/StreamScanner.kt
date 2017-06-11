@@ -16,16 +16,17 @@
 
 package org.platestack.bukkit.scanner
 
-import org.objectweb.asm.*
-import org.platestack.bukkit.scanner.structure.*
+import org.platestack.bukkit.scanner.structure.ClassIdentifier
+import org.platestack.bukkit.scanner.structure.ClassStructure
 import java.io.InputStream
-import kotlin.concurrent.getOrSet
 
 abstract class StreamScanner : Scanner {
     abstract val knownClasses: MutableMap<ClassIdentifier, ClassStructure>
     protected val loadingStructures = ThreadLocal<MutableSet<ClassIdentifier>>()
 
     fun supplyClass(identifier: ClassIdentifier, input: InputStream): ClassStructure {
+        TODO()
+        /*
         val loading = loadingStructures.getOrSet { mutableSetOf() }
         if (!loading.add(identifier))
             error("Cyclic loading from: $loading to $identifier")
@@ -57,11 +58,11 @@ abstract class StreamScanner : Scanner {
                     val field = FieldIdentifier(name)
                     val superStructure = structure.find(field)
                     structure.fields[field] =
-                            superStructure?.let { FieldStructure(superStructure.field, it.owner, AccessLevel[access], SignatureType(desc) { supplyClassChange(it) }) }
+                            superStructure?.let { FieldStructure(superStructure.field, it.owner, AccessLevel[access], ParameterDescriptor(desc) { supplyClassChange(it) }) }
                                     ?: FieldStructure(
                                     FieldChange(Name(field.name)),
                                     structure.`class`, AccessLevel[access],
-                                    SignatureType(desc) { supplyClassChange(it) }
+                                    ParameterDescriptor(desc) { supplyClassChange(it) }
                             )
 
                     return null
@@ -75,7 +76,7 @@ abstract class StreamScanner : Scanner {
                                     ?: MethodStructure(
                                     MethodChange(
                                             Name(method.name),
-                                            MethodSignature(method.signature) { supplyClassChange(it) }
+                                            MethodDescriptor(method.descriptor) { supplyClassChange(it) }
                                     ),
                                     structure.`class`, AccessLevel[access]
                             )
@@ -90,5 +91,6 @@ abstract class StreamScanner : Scanner {
         finally {
             loading.remove(identifier)
         }
+        */
     }
 }

@@ -32,15 +32,17 @@ class ClassRemapEnvironment(
     var reverse = mappings
 
     fun apply(mappings: Mappings) {
-        classes.values.forEach { it.apply(mappings) }
-        this.mappings = mappings.inverse()
-        reverse = mappings
+        TODO()
+        //classes.values.forEach { it.apply(mappings) }
+        //this.mappings = mappings.inverse()
+        //reverse = mappings
     }
 
     private operator fun get(fromFullClassName: String) = get(ClassIdentifier(fromFullClassName))
 
     private fun register(structure: ClassStructure) {
-        structure.apply(mappings)
+        TODO()
+        //structure.apply(mappings)
         classes.computeIfAbsent(structure.`class`.to) { _ ->
             structure.`super`?.let { register(it) }
             structure.interfaces.forEach { register(it) }
@@ -73,24 +75,26 @@ class ClassRemapEnvironment(
     }
 
     override fun mapFieldName(owner: String, name: String, desc: String): String {
+        TODO()
         val classStructure = get(owner) ?: return name
         val identifier = FieldIdentifier(name)
-        val fieldStructure = classStructure.findReverse(identifier) ?: fieldBuilder?.invoke(classStructure, identifier)?.also {
-            classStructure.fields[it.field.from] = it
-            it.apply(mappings)
-        }
+        //val fieldStructure = classStructure.findReverse(identifier) ?: fieldBuilder?.invoke(classStructure, identifier)?.also {
+        //    classStructure.fields[it.field.from] = it
+        //    it.apply(mappings)
+        //}
 
-        return fieldStructure?.field?.from?.name ?: name
+        //return fieldStructure?.field?.from?.name ?: name
     }
 
     override fun mapMethodName(owner: String, name: String, desc: String): String {
+        TODO()
         val classStructure = get(owner) ?: return name
         val identifier = MethodIdentifier(name, desc)
-        val methodStructure = classStructure.findReverse(identifier) ?: methodBuilder?.invoke(classStructure, identifier)?.also {
-            classStructure.methods[it.method.from] = it
-            it.apply(mappings)
-        }
+        //val methodStructure = classStructure.findReverse(identifier) ?: methodBuilder?.invoke(classStructure, identifier)?.also {
+        //    classStructure.methods[it.method.from] = it
+        //    it.apply(mappings)
+        //}
 
-        return methodStructure?.method?.from?.name ?: name
+        //return methodStructure?.method?.from?.name ?: name
     }
 }
