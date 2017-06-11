@@ -20,17 +20,17 @@ import org.platestack.bukkit.scanner.structure.*
 import java.util.stream.Stream
 
 typealias PackageToken = PackageIdentifier
-typealias PackageMapping = HashMap<PackageToken, PackageToken>
+typealias PackageMapping = LinkedHashMap<PackageToken, PackageToken>
 
 typealias ClassToken = ClassIdentifier
-typealias ClassMapping = HashMap<ClassToken, ClassToken>
+typealias ClassMapping = LinkedHashMap<ClassToken, ClassToken>
 
 typealias MethodToken = Pair<ClassIdentifier, MethodIdentifier>
-typealias MethodMapping = HashMap<MethodToken, MethodToken>
+typealias MethodMapping = LinkedHashMap<MethodToken, MethodToken>
 
 typealias FieldToken = Pair<ClassIdentifier, FieldIdentifier>
-typealias FieldMapping = HashMap<FieldToken, FieldToken>
+typealias FieldMapping = LinkedHashMap<FieldToken, FieldToken>
 
 fun Stream<String>.filterComments() = map(String::trim).filter(String::isNotBlank).filter { !it.startsWith('#') }!!
 
-internal typealias SimpleEnv = HashMap<ClassIdentifier, ClassStructure>
+internal typealias SimpleEnv = LinkedHashMap<ClassIdentifier, ClassStructure>
