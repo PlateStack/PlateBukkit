@@ -143,31 +143,16 @@ class BukkitURLMappingsProvider(val base: URL, val logger: Logger, val checkPack
             val line = "$className $fromMethodName $noPackageSignature $toMethodName"
             val classId = remapOrRegisterNoPackage(ClassIdentifier(className)) //fromNoPackage.classes[ClassIdentifier(className)] ?: error("Unknown class while mapping $line")
             val methodSignature = MethodDescriptor(noPackageSignature) { from->
-                val to = remapOrRegisterNoPackage(from)
-                if(from == to) {
-                    to.toChange()
-                }
-                else {
-                    from.toChange({
-                        PackageMove(from.`package`.toChange(), to.`package`.toChange())
-                    }).also {
-                        it.`package`.new = to.`package`.toChange()
-                    }
-                }
+                remapOrRegisterNoPackage(from).toChange()
             }
 
             val newMethod = MethodIdentifier(toMethodName, methodSignature.to)
 
-            /*
-            val inverseSignature = methodSignature.run {
-                MethodDescriptor(returnType.isolated(), parameterTypes.map { it.isolated() }).apply {
-                    apply(inverse)
-                }
+            val inverseSignature = MethodDescriptor(methodSignature.to) { from->
+                inverse.classes[from]!!.toChange()
             }
-            */
 
-            val oldMethod = MethodIdentifier(fromMethodName, methodSignature.to)
-
+            val oldMethod = MethodIdentifier(fromMethodName, inverseSignature.to)
 
             (inverse.classes[classId]!! to oldMethod) to (classId to newMethod)
         }.let {
