@@ -73,13 +73,13 @@ class RemapEnvironment {
             }
 
             structure.fields.values.forEach { native ->
-                mappings.fields[native.owner.to to native.field.to]?.let { foreign ->
+                mappings.fields[fieldsBefore[native.owner.from to native.field.from]!!]?.let { foreign ->
                     native.field.name.to = foreign.second.name
                 }
             }
 
             structure.methods.values.forEach { native ->
-                mappings.methods[native.owner.to to native.method.to]?.let { foreign ->
+                mappings.methods[methodsBefore[native.owner.from to native.method.from]!!]?.let { foreign ->
                     native.method.name.to = foreign.second.name
                 }
             }

@@ -195,7 +195,30 @@ class Mappings {
             classes[from]?.let { new ->
                 name.to = new.className
                 parent?.remap()
-                System.out.println(to)
+            }
+        }
+
+        val remappedMethods = mutableSetOf<MethodToken>()
+        fun MethodStructure.remap() {
+            val token = owner.from to method.from
+            if(!remappedMethods.add(token))
+                return
+
+            methods[token]?.let { new ->
+                method.name.to = new.second.name
+                owner.remap()
+            }
+        }
+
+        val remappedFields = mutableSetOf<FieldToken>()
+        fun FieldStructure.remap() {
+            val token = owner.from to field.from
+            if(!remappedFields.add(token))
+                return
+
+            fields[token]?.let { new ->
+                field.name.to = new.second.name
+                owner.remap()
             }
         }
 
@@ -207,12 +230,14 @@ class Mappings {
 
         debug = environment.classes.values.asSequence()
                 .flatMap { c -> c.fields.values.asSequence().map { c to it } }
+                .onEach { it.second.remap() }
                 .map { (c, f) -> FieldToken(c.`class`.from, f.field.from) to FieldToken(c.`class`.to, f.field.to) }
                 .toMap()
         full.fields += debug
 
         debug = environment.classes.values.asSequence()
                 .flatMap { c -> c.methods.values.asSequence().map { c to it } }
+                .onEach { it.second.remap() }
                 .map { (c, m) -> MethodToken(c.`class`.from, m.method.from) to MethodToken(c.`class`.to, m.method.to) }
                 .toMap()
         full.methods += debug
