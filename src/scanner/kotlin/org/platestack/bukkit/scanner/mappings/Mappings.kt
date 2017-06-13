@@ -17,7 +17,9 @@
 package org.platestack.bukkit.scanner.mappings
 
 import org.platestack.bukkit.scanner.*
-import org.platestack.bukkit.scanner.structure.PackageIdentifier
+import org.platestack.bukkit.scanner.rework.ClassScanner
+import org.platestack.bukkit.scanner.rework.RemapEnvironment
+import org.platestack.bukkit.scanner.structure.*
 import java.io.Writer
 import java.util.*
 
@@ -86,12 +88,62 @@ class Mappings {
         it.fields += fields.inverse()
     }
 
+    /*
+    fun toSomething() {
+        val packageChanges = mutableMapOf<PackageIdentifier, PackageChange>()
+        tailrec fun PackageChange.register() {
+            if(packageChanges.putIfAbsent(from, this) != null)
+                parent?.register()
+        }
+
+        packages.forEach { (from, to) ->
+            val change = packageChanges[from] ?: from.toChange { packageChanges[it] }
+            change.register()
+            if(from != to) {
+                val new = packageChanges[to] ?: to.toChange { packageChanges[it] }
+                new.register()
+                if(from.parent != to) {
+                    change.moveTo = new.parent
+                }
+                else {
+                    change.name.to = new.name.to
+                }
+            }
+        }
+    }
+
+    fun toSomething2() {
+        val packageChanges = packages.entries.associate { (from, to) -> from to from.toChange().also { it.moveTo = to.toChange() } }
+        val pendingClasses = classes.toMutableMap()
+        val classChanges = classes.asSequence().filter { it.key.parent == null && it.value.parent == null }.map { (from, to) ->
+            from to from.toChange(packageProvider = {
+                PackageMove(
+                        packageChanges[from.`package`] ?: from.`package`.toChange(),
+                        packageChanges[to.`package`] ?: to.`package`.toChange()
+                )
+            }).also {
+                it.name.to = to.className
+            }
+        }.toMap()
+
+        pendingClasses.keys.removeAll(classChanges.keys)
+
+        packageChanges.values.first().toString()
+
+        println()
+    }
+    */
+
     fun toKnownStructure(): SimpleEnv {
-        val structures = SimpleEnv()
+        TODO()
         /*
+        val structures = SimpleEnv()
+        val parentMoves = mutableListOf<ClassMove>()
         fun ClassIdentifier.toStructure(): ClassStructure {
             structures[this]?.let { return it }
-            ClassStructure(toChange { it.toStructure().`class` }, null, emptyList()).let {
+            ClassStructure(this, null, null, emptySet(), parentProvider = {
+                ClassMove(it.toChange())
+            }) { error("Unexpected call") }.let {
                 structures[this] = it
                 return it
             }
@@ -99,39 +151,116 @@ class Mappings {
 
         classes.forEach { from, to ->
             val structure = from.toStructure()
-            structure.`class`.`package`.name.reverse = to.`package`.toChange().name.current
-            structure.`class`.`package`.checkReverse()
+            structure.`class`.`package`.new = to.`package`.toChange()
             structure.`class`.name.to = to.className
         }
 
         fields.forEach { (fromClass, fromField), (_, toField) ->
             val structure = fromClass.toStructure()
             val fieldChange = fromField.toChange()
-            fieldChange.name.reverse = toField.name
-            structure.fields[fromField] = FieldStructure(fieldChange, structure.`class`, AccessLevel.UNKNOWN, ParameterDescriptor(false, 'V', null))
+            fieldChange.name.to = toField.name
+            structure.fields[fromField] = FieldStructure(fieldChange, structure.`class`, AccessLevel.UNKNOWN, null, null)
         }
 
         methods.forEach { (fromClass, fromMethod), (_, toMethod) ->
             val structure = fromClass.toStructure()
             val methodChange = fromMethod.toChange { it.toStructure().`class` }
-            methodChange.name.reverse = toMethod.name
-            structure.methods[fromMethod] = MethodStructure(methodChange, structure.`class`, AccessLevel.UNKNOWN)
+            methodChange.name.to = toMethod.name
+            structure.methods[fromMethod] = MethodStructure(methodChange, structure.`class`, AccessLevel.UNKNOWN, null)
         }
-        */
-        TODO()
+
         return structures
+        */
+    }
+
+    fun toFullStructure(scanner: ClassScanner): RemapEnvironment {
+        val environment = RemapEnvironment()
+
+        packages.forEach { (from, to) -> environment[from] = PackageMove(from.toChange(), to.toChange()) }
+        classes.keys.forEach { id -> scanner.provideFull(environment, id) }
+        methods.keys.forEach { (owner, id) -> scanner.provide(environment, owner, id) }
+        fields.keys.forEach { (owner, id) -> scanner.provide(environment, owner, id) }
+
+
+
+        val full = Mappings()
+        var debug: Any
+
+        val remapped = mutableSetOf<ClassIdentifier>()
+
+        fun ClassChange.remap() {
+            if(!remapped.add(from))
+                return
+
+            classes[from]?.let { new ->
+                name.to = new.className
+                parent?.remap()
+                System.out.println(to)
+            }
+        }
+
+        debug = environment.classes.values.asSequence()
+                .onEach { it.`class`.remap() }
+                .map { it.`class`.from to it.`class`.to }
+                .toMap()
+        full.classes += debug
+
+        debug = environment.classes.values.asSequence()
+                .flatMap { c -> c.fields.values.asSequence().map { c to it } }
+                .map { (c, f) -> FieldToken(c.`class`.from, f.field.from) to FieldToken(c.`class`.to, f.field.to) }
+                .toMap()
+        full.fields += debug
+
+        debug = environment.classes.values.asSequence()
+                .flatMap { c -> c.methods.values.asSequence().map { c to it } }
+                .map { (c, m) -> MethodToken(c.`class`.from, m.method.from) to MethodToken(c.`class`.to, m.method.to) }
+                .toMap()
+        full.methods += debug
+        return environment
+    }
+
+    fun bridge(
+            scanner: ClassScanner,
+            mappings: Mappings,
+            revertMissingClasses: Boolean = false,
+            revertMissingFields: Boolean = false,
+            revertMissingMethods: Boolean = false
+    ) : Mappings {
+
+        val environment = RemapEnvironment()
+
+        classes.forEach { (from, to) ->
+            val change = scanner.provide(environment, from)?.`class` ?:
+                            ClassStructure(
+                                from.toChange({ scanner.provide(environment, it) }),
+                                null, null, emptySet()
+                            ).also { environment[it.`class`.from] = it }.`class`
+
+            if(from != to) {
+                if(from.`package` != to.`package`) {
+                    change.`package`.new = to.`package`.toChange()
+                }
+
+                //if(from.parent != to.parent) {
+                //    change.parent.new = to.parent?.toChange() //to.parent?.let { checkNotNull(scanner.provide(environment, it)).`class` }
+                //}
+
+                if(from.className != to.className) {
+                    change.name.to = to.className
+                }
+            }
+        }
+
+        TODO()
     }
 
     fun bridge(mappings: Mappings, revertMissingClasses: Boolean = false, revertMissingFields: Boolean = false, reverMissingMethods: Boolean = false): Mappings {
         val structures = toKnownStructure()
-        TODO()
-        /*
         classes.forEach { from, to ->
             val next = mappings.classes[to] ?: if(revertMissingClasses) from else to
             structures[from]!!.`class`.let {
                 it.name.to = next.className
-                it.`package`.name.reverse = next.`package`.toChange().to.fullName
-                it.`package`.checkReverse()
+                it.`package`.new = next.`package`.toChange()
             }
         }
 
@@ -144,12 +273,21 @@ class Mappings {
             val next = mappings.methods[to]?.second ?: if(reverMissingMethods) fromMethod else to.second
             structures[fromClass]!!.methods[fromMethod]!!.method.name.to = next.name
         }
-        */
         return structures.toMappings()
     }
 
     fun SimpleEnv.toMappings(): Mappings {
         val result = Mappings()
+
+        result.packages += values.asSequence()
+                .map { it.`class`.`package`.let { it.from to it.to } }
+                .filterNot { (from,to) -> from == to }
+                .groupBy { it.first }
+                .mapValuesTo(TreeMap<PackageIdentifier, PackageIdentifier>(compareBy { it.fullName })) { (_, value) ->
+                    if (value.size == 1) value.first().second
+                    else value.maxBy { (_, alt) -> classes.keys.count { it.`package` == alt } }!!.second
+                }
+
         result.classes += values.associate { structure ->
             val from = structure.`class`.from
             val to = structure.`class`.to
@@ -164,6 +302,7 @@ class Mappings {
 
             from to to
         }
+
         return result
     }
 
@@ -186,9 +325,11 @@ class Mappings {
     }
 
     operator fun plus(mappings: Mappings) : Mappings {
-        val structure = toKnownStructure()
         TODO()
-        //structure.values.forEach { it.apply(mappings) }
+        /*
+        val structure = toKnownStructure()
+        structure.values.forEach { it.apply(mappings) }
         return structure.toMappings()
+        */
     }
 }

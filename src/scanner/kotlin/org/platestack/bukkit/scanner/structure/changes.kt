@@ -92,8 +92,8 @@ data class ClassMove(override val old: ClassChange?, override var new: ClassChan
  * @property parent The class which nests this class or is referred by this class name before the actual name
  * @property name The actual name of this class. Must contains the separation character.
  */
-data class ClassChange(val `package`: PackageMove, var parent: ClassMove, val name: ClassName) : Change {
-    override val from: ClassIdentifier = ClassIdentifier(`package`.from, parent.from, name.from)
-    override val to: ClassIdentifier get() = ClassIdentifier(`package`.to, parent.to, name.to)
+data class ClassChange(val `package`: PackageMove, var parent: ClassChange?, val name: ClassName) : Change {
+    override val from: ClassIdentifier get() = ClassIdentifier(parent?.from?.`package` ?: `package`.from, parent?.from, name.from)
+    override val to: ClassIdentifier get() = ClassIdentifier(parent?.to?.`package` ?: `package`.to, parent?.to, name.to)
     override fun toString() = "$from -> $to"
 }

@@ -51,12 +51,33 @@ class Test
         URL base = new File("D:\\_InteliJ\\org.platestack\\Mappings").toURI().toURL();
         Logger logger = Logger.getLogger("main");
         Srg2NotchURLMappingsProvider srgProvider = new Srg2NotchURLMappingsProvider(base, logger);
-        Mappings srg = srgProvider.invoke("1.11.2", "1.11.2-R0.1-SNAPSHOT", "v1_11_R1");
-        System.out.println(srg);
+        Mappings srg2notchMapping = srgProvider.invoke("1.11.2", "1.11.2-R0.1-SNAPSHOT", "v1_11_R1");
+        System.out.println(srg2notchMapping);
 
         BukkitURLMappingsProvider bukkitProvider = new BukkitURLMappingsProvider(base, logger, true);
-        Mappings bukkit = bukkitProvider.invoke("1.11.2", "1.11.2-R0.1-SNAPSHOT", "v1_11_R1");
-        System.out.println(bukkit);
+        Mappings notch2craftMapping = bukkitProvider.invoke("1.11.2", "1.11.2-R0.1-SNAPSHOT", "v1_11_R1");
+        System.out.println(notch2craftMapping);
+
+        RemapEnvironment craft2notch = notch2craftMapping.inverse().toFullStructure(new HybridScanner(Thread.currentThread().getContextClassLoader()));
+        RemapEnvironment notch2srg = craft2notch.inverse();
+        notch2srg.applyToNative(srg2notchMapping.inverse());
+        System.out.println(notch2srg);
+
+        RemapEnvironment srg2craft = notch2srg.inverse();
+        srg2craft.applyToForeign(notch2craftMapping);
+        System.out.println(srg2craft);
+
+        /*
+        RemapEnvironment srg2notch = notch2srg.inverse();
+        srg2notch.applyToNative(notch2craftMapping);
+
+
+        Mappings bridge = notch2craftMapping.inverse().bridge(new HybridScanner(Test.class.getClassLoader()), srg2notchMapping.inverse(), false, false, false);
+        System.out.println(bridge);
+
+        Mappings srg2bukkit = srg2notchMapping.bridge(notch2craftMapping, true, false, false);
+        System.out.println(srg2bukkit);
+        */
     }
 
     public static void main1(String[] args)

@@ -25,10 +25,11 @@ interface Identifier
 /**
  * A field name
  */
-data class FieldIdentifier(val name: String): Identifier {
+data class FieldIdentifier(val name: String): Identifier, Comparable<FieldIdentifier> {
     override fun toString() = name
 
     fun toChange() = FieldChange(Name(name))
+    override fun compareTo(other: FieldIdentifier) = name.compareTo(other.name)
 }
 
 private val validMethod = Regex("^\\((\\)V|(\\[*([BCDFIJSZ]|L[^;]+;))*\\)(V|\\[*([BCDFIJSZ]|L[^;]+;)))$")
@@ -37,7 +38,7 @@ private val validMethod = Regex("^\\((\\)V|(\\[*([BCDFIJSZ]|L[^;]+;))*\\)(V|\\[*
 /**
  * A method name and its descriptor
  */
-data class MethodIdentifier(val name: String, val descriptor: String): Identifier {
+data class MethodIdentifier(val name: String, val descriptor: String): Identifier, Comparable<MethodIdentifier> {
     override fun toString() = "$name $descriptor"
 
     init {
@@ -46,6 +47,8 @@ data class MethodIdentifier(val name: String, val descriptor: String): Identifie
 
     fun toChange(classSupplier: (ClassIdentifier) -> ClassChange = { it.toChange() }) =
             MethodChange(Name(name), MethodDescriptor(descriptor, classSupplier))
+
+    override fun compareTo(other: MethodIdentifier) = toString().compareTo(other.toString())
 }
 
 /**
@@ -58,7 +61,7 @@ data class MethodIdentifier(val name: String, val descriptor: String): Identifie
  *
  * @property prefix The same as [fullName] but with a trailing '/'
  */
-data class PackageIdentifier constructor(val parent: PackageIdentifier?, val name: String): Identifier {
+data class PackageIdentifier constructor(val parent: PackageIdentifier?, val name: String): Identifier, Comparable<PackageIdentifier> {
     constructor(parentName: String, name: String): this(if(parentName.isBlank()) null else PackageIdentifier(parentName), name)
     constructor(fullName: String): this(fullName.substringBeforeLast('/', ""), fullName.substringAfterLast('/'))
 
@@ -80,6 +83,7 @@ data class PackageIdentifier constructor(val parent: PackageIdentifier?, val nam
     private val hashCode by lazy { Objects.hash(parent, name) }
     override fun hashCode() = hashCode
     override fun toString() = prefix
+    override fun compareTo(other: PackageIdentifier) = prefix.compareTo(other.prefix)
 }
 
 /**
@@ -105,7 +109,7 @@ data class PackageIdentifier constructor(val parent: PackageIdentifier?, val nam
  * @property fullSimpleName The combination of the parent's name with this name, excluding the package name
  * @property fullName The full name including the package and the parent name.
  */
-data class ClassIdentifier(val `package`: PackageIdentifier, val parent: ClassIdentifier?, val className: String): Identifier {
+data class ClassIdentifier(val `package`: PackageIdentifier, val parent: ClassIdentifier?, val className: String): Identifier, Comparable<ClassIdentifier> {
 
     init {
         require(className.isNotBlank()) { "The class name can't be empty" }
@@ -118,12 +122,13 @@ data class ClassIdentifier(val `package`: PackageIdentifier, val parent: ClassId
     val fullName: String = `package`.prefix + fullSimpleName
 
     fun toChange(packageProvider: (PackageIdentifier) -> PackageMove = { PackageMove(it.toChange()) },
-                 parentProvider: (ClassIdentifier) -> ClassMove? = { null }
+                 parentProvider: (ClassIdentifier) -> ClassChange? = { null }
     ): ClassChange {
         return ClassChange(
-                packageProvider(`package`),
-                parent?.let { parentProvider(it) ?: ClassMove(it.toChange(packageProvider, parentProvider)) }
-                        ?: ClassMove(null, null),
+                packageProvider(`package`).let { PackageMove(it.old, it.new) },
+                parent?.let { parentProvider(it) ?: it.toChange(packageProvider, parentProvider) },
+                //parent?.let { parentProvider(it) ?: ClassMove(it.toChange(packageProvider, parentProvider)) }
+                //        ?: ClassMove(null, null),
                 ClassName(className)
         )
     }
@@ -173,4 +178,5 @@ data class ClassIdentifier(val `package`: PackageIdentifier, val parent: ClassId
     private val hashCode by lazy { Objects.hash(`package`, parent, className) }
     override fun hashCode() = hashCode
     override fun toString() = fullName
+    override fun compareTo(other: ClassIdentifier) = fullName.compareTo(other.fullName)
 }

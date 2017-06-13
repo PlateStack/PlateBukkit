@@ -17,6 +17,7 @@
 package org.platestack.bukkit.scanner.rework
 
 import org.platestack.bukkit.scanner.structure.*
+import org.platestack.util.orElse
 
 /**
  * Object which can provide structural information about classes
@@ -153,7 +154,22 @@ interface ClassScanner {
                             ClassMove(fake.`class`)
                         }
                     },
-                    structureProvider = { scanner.provide(environment, it, fullParents) ?: error("Referred class not found: $it ; Referred by: $classId") }
+                    structureProvider = {
+                        scanner.provide(environment, it, fullParents).orElse {
+                            if(it.parent != null) {
+                                System.err.println("Creating fake structure for intermediary class: $it")
+                                val fake = ClassStructure(it.toChange(
+                                        packageProvider = { scanner.provide(environment, it) },
+                                        parentProvider = { checkNotNull(scanner.provide(environment, it, fullParents)) { TODO("Unsupported 2 class deep missing parent: $it") }.`class` }
+                                ), null, null, emptySet()).also {
+                                    environment[it.`class`.from] = it
+                                }
+                                fake
+                            }
+                            else {
+                                error("Referred class not found: $it ; Referred by: $classId")
+                            }
+                        }  }
             )
 
             return structure

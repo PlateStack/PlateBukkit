@@ -71,6 +71,8 @@ open class Name protected constructor(override final val from: String, to: Strin
     }
 }
 
+private val arrayPattern = Regex("^\\[+")
+
 /**
  * The JVM descriptor which indicates a field or parameter type
  * @property array If this descriptor begins with `[`
@@ -79,11 +81,11 @@ open class Name protected constructor(override final val from: String, to: Strin
  * @property from The original descriptor
  * @property to The descriptor after the transformation
  */
-data class ParameterDescriptor(val array: Boolean, val base: Char, val type: ClassChange?) : Change {
+data class ParameterDescriptor(val array: String, val base: Char, val type: ClassChange?) : Change {
     constructor(signature: String, classSupplier: (ClassIdentifier) -> ClassChange): this(StringBuilder(signature), classSupplier)
     private constructor(b: StringBuilder, classSupplier: (ClassIdentifier) -> ClassChange)
             : this(
-            if(b.first() == '[') { b.deleteCharAt(0); true } else false,
+            arrayPattern.find(b)?.value?.let { b.delete(0, it.length); it } ?: "",
             b.first(), b.first().let { if(it == 'L') classSupplier(ClassIdentifier(b.substring(1, b.length - 1))) else null }
     )
 
@@ -92,8 +94,8 @@ data class ParameterDescriptor(val array: Boolean, val base: Char, val type: Cla
         check((type == null && base != 'L') || (base == 'L' && type != null)) { "Object types must declare the base to 'L' and the referred type." }
     }
 
-    override val from = if(array) "[" else {""} + base + (type?.from?.fullName?.let { it+';' } ?: "")
-    override val to get() = if(array) "[" else {""} + base + (type?.to?.fullName?.let { it+';' } ?: "")
+    override val from = array + base + (type?.from?.fullName?.let { it+';' } ?: "")
+    override val to get() = array + base + (type?.to?.fullName?.let { it+';' } ?: "")
     override fun toString() = "$from -> $to"
 }
 

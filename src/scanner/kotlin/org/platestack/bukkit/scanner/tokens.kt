@@ -17,6 +17,7 @@
 package org.platestack.bukkit.scanner
 
 import org.platestack.bukkit.scanner.structure.*
+import java.util.*
 import java.util.stream.Stream
 
 typealias PackageToken = PackageIdentifier
@@ -34,3 +35,5 @@ typealias FieldMapping = LinkedHashMap<FieldToken, FieldToken>
 fun Stream<String>.filterComments() = map(String::trim).filter(String::isNotBlank).filter { !it.startsWith('#') }!!
 
 internal typealias SimpleEnv = LinkedHashMap<ClassIdentifier, ClassStructure>
+
+internal typealias ReverseMap<T> = IdentityHashMap<T,T>

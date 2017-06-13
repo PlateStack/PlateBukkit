@@ -46,7 +46,7 @@ data class MethodStructure(val method: MethodChange, override val owner: ClassCh
     override fun toString() = "${owner.from}#${method.from} -> ${owner.to}#${method.to}"
 }
 
-data class FieldStructure(val field: FieldChange, override val owner: ClassChange, override var access: AccessLevel, var static: Boolean?, val descriptor: ParameterDescriptor) : ClassScoped {
+data class FieldStructure(val field: FieldChange, override val owner: ClassChange, override var access: AccessLevel, var static: Boolean?, val descriptor: ParameterDescriptor?) : ClassScoped {
     override fun toString() = "${owner.from}#${field.from} -> ${owner.to}#${field.to}"
 }
 
@@ -87,8 +87,15 @@ class ClassStructure private constructor(var isInterface: Boolean?, val interfac
                 try {
                     fun ClassIdentifier.create() =
                             if(packageProvider != null) {
+                                toChange(packageProvider) { structureProvider(it).`class` }
+                            }
+                            else {
+                                toChange { structureProvider(it).`class` }
+                            }
+                            /*
+                            if(packageProvider != null) {
                                 if(parentProvider != null) {
-                                    toChange(packageProvider, parentProvider)
+                                    //toChange(packageProvider, parentProvider)
                                 }
                                 else {
                                     toChange(packageProvider)
@@ -102,6 +109,7 @@ class ClassStructure private constructor(var isInterface: Boolean?, val interfac
                                     toChange()
                                 }
                             }
+                            */
 
                     structure.`class` = id.create()
                     structure.`super` = `super`?.let(structureProvider)

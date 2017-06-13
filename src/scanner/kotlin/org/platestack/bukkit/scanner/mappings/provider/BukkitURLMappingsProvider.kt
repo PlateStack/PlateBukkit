@@ -140,7 +140,6 @@ class BukkitURLMappingsProvider(val base: URL, val logger: Logger, val checkPack
         }
 
         methodList.associate { (className, fromMethodName, noPackageSignature, toMethodName) ->
-            val line = "$className $fromMethodName $noPackageSignature $toMethodName"
             val classId = remapOrRegisterNoPackage(ClassIdentifier(className)) //fromNoPackage.classes[ClassIdentifier(className)] ?: error("Unknown class while mapping $line")
             val methodSignature = MethodDescriptor(noPackageSignature) { from->
                 remapOrRegisterNoPackage(from).toChange()
