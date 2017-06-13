@@ -140,7 +140,7 @@ task bootJar(type: Jar, dependsOn: [':initialClasses', ':classes', ':plate-commo
         }
 
         into('util') {
-            from { project(path: ':plate-api').sourceSets.util.output }
+            from { project(':plate-api').sourceSets.util.output }
         }
     }
 
