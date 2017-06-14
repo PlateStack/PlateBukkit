@@ -27,11 +27,10 @@ import org.platestack.bukkit.scanner.structure.FieldIdentifier
 import org.platestack.bukkit.scanner.structure.MethodIdentifier
 import org.platestack.common.transform.TransformingClassLoader
 import java.io.InputStream
-import java.net.URLClassLoader
 
 class MainTransformerClassLoader(parent: MainClassLoader): TransformingClassLoader(parent), RemapEnvironmentHost {
     override val environment = RemapEnvironment(parent.environment)
-    private val scanner = ResourceLoaderScanner(URLClassLoader(parent.urLs))
+    private val scanner = ResourceLoaderScanner(parent)
 
     private val remapper = object : Remapper() {
         override fun map(typeName: String): String {

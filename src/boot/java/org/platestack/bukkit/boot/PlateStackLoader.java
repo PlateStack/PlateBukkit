@@ -307,7 +307,7 @@ final public class PlateStackLoader extends JavaPlugin
                     .newInstance(new URL[]{moduleMain}, coreDepsClassLoader);
 
             // Setup main transformer class loader
-            classLoader = (ClassLoader) rootClassLoader.loadClass("org.platestack.bukkit.scanner.transform.MainTransformerClassLoader")
+            classLoader = (ClassLoader) classLoader.loadClass("org.platestack.bukkit.scanner.transform.MainTransformerClassLoader")
                     .getConstructor(mainClassLoaderClass)
                     .newInstance(classLoader);
 

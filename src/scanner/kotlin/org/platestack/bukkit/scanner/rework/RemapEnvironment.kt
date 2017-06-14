@@ -53,7 +53,7 @@ class RemapEnvironment(val parent: RemapEnvironment? = null) {
                     if(native.from.parent != foreign.parent) {
                         native.new.moveTo = foreign.parent?.toChange()?.also { newPackages[it.from] = it }
                     }
-                    println("PK: ${native.from} ${native.to}")
+                    //println("PK: ${native.from} ${native.to}")
                 }
             }
         }
@@ -85,7 +85,7 @@ class RemapEnvironment(val parent: RemapEnvironment? = null) {
             }
         }
 
-        classes.values.asSequence().map { it.`class` }.sortedBy { it.from }.forEach { println("CL: ${it.from} ${it.to}") }
+        //classes.values.asSequence().map { it.`class` }.sortedBy { it.from }.forEach { println("CL: ${it.from} ${it.to}") }
         (packages as MutableMap) += newPackages.map { it.key to PackageMove(it.value) }
     }
 
@@ -99,7 +99,7 @@ class RemapEnvironment(val parent: RemapEnvironment? = null) {
                     if(native.from.parent != foreign.parent) {
                         native.new.moveTo = foreign.parent?.toChange()?.also { newPackages[it.from] = it }
                     }
-                    println("PK: ${native.from} ${native.to}")
+                    //println("PK: ${native.from} ${native.to}")
                 }
             }
         }
@@ -130,7 +130,7 @@ class RemapEnvironment(val parent: RemapEnvironment? = null) {
             }
         }
 
-        classes.values.asSequence().map { it.`class` }.sortedBy { it.from }.forEach { println("CL: ${it.from} ${it.to}") }
+        //classes.values.asSequence().map { it.`class` }.sortedBy { it.from }.forEach { println("CL: ${it.from} ${it.to}") }
         (packages as MutableMap) += newPackages.map { it.key to PackageMove(it.value) }
     }
 
