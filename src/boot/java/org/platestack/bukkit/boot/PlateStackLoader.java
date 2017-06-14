@@ -41,7 +41,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -316,6 +315,7 @@ final public class PlateStackLoader extends JavaPlugin
             if(classLoader != plateBukkitClass.getClassLoader())
                 throw new IllegalStateException("The PlateBukkit class was not loaded by our custom classloader which contains all the required libraries! "+initialResolverClass.getClassLoader());
 
+            /*
             final Class<?> transformerClass = classLoader.loadClass("org.platestack.bukkit.server.mappings.BukkitTransformer");
             if(classLoader != plateBukkitClass.getClassLoader())
                 throw new IllegalStateException("The BukkitTransformer object was not loaded by our custom classloader which contains all the required libraries! "+initialResolverClass.getClassLoader());
@@ -331,9 +331,10 @@ final public class PlateStackLoader extends JavaPlugin
 
             transformerClass.getDeclaredMethod("initialize", ClassLoader.class, Logger.class)
                     .invoke(transformer, classLoader, getLogger());
+            */
 
-            final Constructor<?> constructor = plateBukkitClass.getDeclaredConstructor(JavaPlugin.class, transformerInterface);
-            final Object plateBukkit = constructor.newInstance(this, transformer);
+            final Constructor<?> constructor = plateBukkitClass.getDeclaredConstructor(JavaPlugin.class);
+            final Object plateBukkit = constructor.newInstance(this);
 
             final Method onEnableMethod = plateBukkitClass.getMethod("onEnable");
             onEnableMethod.invoke(plateBukkit);

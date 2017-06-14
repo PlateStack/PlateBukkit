@@ -35,15 +35,16 @@ import org.platestack.api.structure.ReflectionTarget
 import org.platestack.bukkit.boot.PlateStackLoader
 import org.platestack.bukkit.message.BukkitTranslator
 import org.platestack.bukkit.plugin.BukkitNamespace
+import org.platestack.bukkit.scanner.transform.MainTransformerClassLoader
+import org.platestack.bukkit.scanner.transform.RemapClassLoader
 import org.platestack.common.plugin.loader.CommonLoader
-import org.platestack.common.transform.Transformer
 import org.platestack.libraryloader.ivy.LibraryResolver
 import org.platestack.structure.immutable.immutableSetOf
 import java.io.File
 import java.nio.file.Paths
 
 class PlateBukkit @ReflectionTarget(PlateStackLoader::class) constructor(
-        private val actualPlugin: JavaPlugin, private val transformer: Transformer
+        private val actualPlugin: JavaPlugin
 ) : PlateServer, org.bukkit.plugin.Plugin by actualPlugin {
     override val platformName: String get() = "bukkit"
     override val platform = PlatformNamespace("bukkit" to Version.parse(Bukkit.getBukkitVersion()))
@@ -51,10 +52,16 @@ class PlateBukkit @ReflectionTarget(PlateStackLoader::class) constructor(
 
     @ReflectionTarget(PlateStackLoader::class)
     override fun onEnable() {
+        val classLoader = javaClass.classLoader.let {
+            it as? MainTransformerClassLoader ?: error("The PlateBukkit class was loaded from an incorrect class loader: $it")
+        }
+
         logger.info("PlateBukkit has been loaded successfully, setting up PlateStack...")
         LibraryResolver.setUserDir(File(dataFolder, "libs").absoluteFile)
 
-        val loader = CommonLoader(KotlinLogging.logger("PlateStack"), javaClass.classLoader, transformer)
+        val loader = CommonLoader(KotlinLogging.logger("PlateStack"), classLoader.main.coreDeps.root) { pluginClassLoader ->
+            RemapClassLoader(pluginClassLoader, classLoader.main.environment)
+        }
 
         PlateStack = this
         PlateNamespace.loader = loader

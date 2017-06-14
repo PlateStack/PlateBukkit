@@ -31,4 +31,8 @@ public class CoreDependenciesClassLoader extends URLClassLoader implements Envir
     {
         return ((ScannerClassLoader) getParent().getParent()).getEnvironment();
     }
+
+    public RootClassLoader getRoot() {
+        return (RootClassLoader) getParent();
+    }
 }

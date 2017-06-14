@@ -42,5 +42,6 @@ class CoreDependenciesClassLoader(urls: Array<URL>, parent: RootClassLoader): UR
 }
 
 class MainClassLoader(urls: Array<URL>, parent: BootCoreDepsClassLoader): URLClassLoader(urls, parent), RemapEnvironmentHost {
+    val coreDeps get() = parent as BootCoreDepsClassLoader
     override val environment get() = (parent.parent.parent as BootScannerClassLoader).environment as RemapEnvironment
 }

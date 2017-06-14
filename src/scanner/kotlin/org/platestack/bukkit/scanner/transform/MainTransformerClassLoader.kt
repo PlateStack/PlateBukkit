@@ -16,46 +16,6 @@
 
 package org.platestack.bukkit.scanner.transform
 
-import org.objectweb.asm.ClassReader
-import org.objectweb.asm.ClassWriter
-import org.objectweb.asm.commons.ClassRemapper
-import org.objectweb.asm.commons.Remapper
-import org.platestack.bukkit.scanner.rework.RemapEnvironment
-import org.platestack.bukkit.scanner.rework.ResourceLoaderScanner
-import org.platestack.bukkit.scanner.structure.ClassIdentifier
-import org.platestack.bukkit.scanner.structure.FieldIdentifier
-import org.platestack.bukkit.scanner.structure.MethodIdentifier
-import org.platestack.common.transform.TransformingClassLoader
-import java.io.InputStream
-
-class MainTransformerClassLoader(parent: MainClassLoader): TransformingClassLoader(parent), RemapEnvironmentHost {
-    override val environment = RemapEnvironment(parent.environment)
-    private val scanner = ResourceLoaderScanner(parent)
-
-    private val remapper = object : Remapper() {
-        override fun map(typeName: String): String {
-            return scanner.provide(environment, ClassIdentifier(typeName))?.`class`?.to?.fullName ?: typeName
-        }
-
-        override fun mapFieldName(owner: String, name: String, desc: String): String {
-            return scanner.provide(environment, ClassIdentifier(owner), FieldIdentifier(name))?.field?.to?.name ?: name
-        }
-
-        override fun mapMethodName(owner: String, name: String, desc: String): String {
-            return scanner.provide(environment, ClassIdentifier(owner), MethodIdentifier(name, desc))?.method?.to?.name ?: name
-        }
-    }
-
-    override fun transform(source: ClassLoader, name: String, input: InputStream): ByteArray {
-        val reader = ClassReader(input)
-        val writer = ClassWriter(0)
-
-        synchronized(this) {
-            ClassRemapper(writer, remapper).let {
-                reader.accept(it, 0)
-            }
-        }
-
-        return writer.toByteArray()
-    }
+class MainTransformerClassLoader(parent: MainClassLoader): RemapClassLoader(parent, parent.environment) {
+    val main get() = parent as MainClassLoader
 }
