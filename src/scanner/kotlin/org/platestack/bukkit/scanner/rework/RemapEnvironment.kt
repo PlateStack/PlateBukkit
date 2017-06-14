@@ -16,6 +16,7 @@
 
 package org.platestack.bukkit.scanner.rework
 
+import org.platestack.bukkit.boot.BootReflectionTarget
 import org.platestack.bukkit.scanner.*
 import org.platestack.bukkit.scanner.mappings.Mappings
 import org.platestack.bukkit.scanner.structure.*
@@ -25,6 +26,7 @@ class RemapEnvironment(val parent: RemapEnvironment? = null) {
     val packages: Map<PackageToken, PackageMove> = sortedMapOf()
     val classes: Map<ClassToken, ClassStructure> = sortedMapOf()
 
+    @BootReflectionTarget
     fun export(dir: File) {
         dir.mkdirs()
         File(dir, "mappings.srg").writer().buffered().use { out->
@@ -207,7 +209,6 @@ class RemapEnvironment(val parent: RemapEnvironment? = null) {
         packages.values.forEach { it.inverse() }
 
         val classChanges = ReverseMap<ClassChange>()
-        val classMoves = ReverseMap<ClassMove>()
 
         fun ClassChange.inverse(): ClassChange {
             classChanges[this]?.let { return it }
@@ -219,14 +220,6 @@ class RemapEnvironment(val parent: RemapEnvironment? = null) {
             )
 
             classChanges[this] = inverse
-            return inverse
-        }
-
-        fun ClassMove.inverse(): ClassMove {
-            classMoves[this]?.let { return it }
-
-            val inverse = ClassMove(new?.inverse(), old?.inverse())
-            classMoves[this] = inverse
             return inverse
         }
 

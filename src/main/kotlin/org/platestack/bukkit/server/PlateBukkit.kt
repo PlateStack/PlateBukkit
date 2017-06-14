@@ -31,8 +31,7 @@ import org.platestack.api.server.PlateServer
 import org.platestack.api.server.PlateStack
 import org.platestack.api.server.PlatformNamespace
 import org.platestack.api.server.internal.InternalAccessor
-import org.platestack.api.structure.ReflectionTarget
-import org.platestack.bukkit.boot.PlateStackLoader
+import org.platestack.bukkit.boot.BootReflectionTarget
 import org.platestack.bukkit.message.BukkitTranslator
 import org.platestack.bukkit.plugin.BukkitNamespace
 import org.platestack.bukkit.scanner.transform.MainTransformerClassLoader
@@ -43,14 +42,15 @@ import org.platestack.structure.immutable.immutableSetOf
 import java.io.File
 import java.nio.file.Paths
 
-class PlateBukkit @ReflectionTarget(PlateStackLoader::class) constructor(
+@BootReflectionTarget
+class PlateBukkit(
         private val actualPlugin: JavaPlugin
 ) : PlateServer, org.bukkit.plugin.Plugin by actualPlugin {
     override val platformName: String get() = "bukkit"
     override val platform = PlatformNamespace("bukkit" to Version.parse(Bukkit.getBukkitVersion()))
     override lateinit var translator: BukkitTranslator
 
-    @ReflectionTarget(PlateStackLoader::class)
+    @BootReflectionTarget
     override fun onEnable() {
         val classLoader = javaClass.classLoader.let {
             it as? MainTransformerClassLoader ?: error("The PlateBukkit class was loaded from an incorrect class loader: $it")

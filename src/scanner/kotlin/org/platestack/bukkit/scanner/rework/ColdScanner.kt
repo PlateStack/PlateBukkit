@@ -58,36 +58,10 @@ interface ColdScanner : ClassScanner {
     ) : ClassHierarchyVisitor(classId, delegate, false) {
         var methods: MutableList<ColdScanner.MethodStructureData> = if(methodId == null) mutableListOf() else ArrayList(1)
 
-        /*
-        fun findMethodOwner(methodId: MethodIdentifier): MethodChange {
-            val parents = (sequenceOf(superclass) + checkNotNull(interfaceIds).asSequence()).filterNotNull()
-            val parentMethod = parents.map { scanner.provide(environment, it, methodId) }.filterNotNull().firstOrNull()
-            if(parentMethod != null && parentMethod.isStatic == false) {
-                if(when(parentMethod.access) {
-                    PRIVATE -> false
-                    INTERNAL -> parentMethod.owner.`package`.from == classId.`package`
-                    PROTECTED, PUBLIC, UNKNOWN -> true
-                }) {
-                    return parentMethod.method
-                }
-            }
-
-            return methodId.toChange { checkNotNull(scanner.provide(environment, it)).`class` }
-        }
-        */
-
         override fun visitMethod(access: Int, name: String, desc: String, signature: String?, exceptions: Array<out String>?): MethodVisitor? {
             if((constructors || (name != "<init>" && name != "<clinit>")) && (methodId == null || (name == methodId.name && desc == methodId.descriptor))) {
                 val methodId = methodId ?: MethodIdentifier(name, desc)
 
-                /*
-                val method = MethodStructure(
-                        findMethodOwner(methodId),
-                        checkNotNull(scanner.provide(environment, checkNotNull(classId))).`class`,
-                        AccessLevel[access],
-                        Modifier.isStatic(access)
-                )
-                */
                 val method = ColdScanner.MethodStructureData(methodId, access)
                 methods.add(method)
                 if(this.methodId != null && cv == null)
@@ -128,38 +102,6 @@ interface ColdScanner : ClassScanner {
     }
 
     fun scan(environment: RemapEnvironment, classId: ClassIdentifier, fieldId: FieldIdentifier, classReader: ClassReader, delegate: ClassVisitor? = null): FieldStructure? {
-        /*
-        var field: FieldStructure? = null
-        var superclass: ClassIdentifier? = null
-
-        val visitor = object : ClassVisitor(Opcodes.ASM5, delegate) {
-            override fun visit(version: Int, access: Int, name: String, signature: String?, superName: String?, interfaces: Array<out String>?) {
-                if(name != classId.fullName)
-                    throw DifferentClassException(expected = classId.fullName, found = name)
-
-                superName?.let { superclass = ClassIdentifier(it) }
-                delegate?.safeCall { visit(version, access, name, signature, superName, interfaces) }
-            }
-
-            override fun visitField(access: Int, name: String, desc: String, signature: String?, value: Any?): FieldVisitor? {
-                if(name == fieldId.name) {
-                    field = FieldStructure(
-                            fieldId.toChange(),
-                            checkNotNull(provide(environment, classId)).`class`,
-                            AccessLevel[access],
-                            Modifier.isStatic(access),
-                            ParameterDescriptor(desc) {
-                                checkNotNull(provide(environment, it)).`class`
-                            }
-                    )
-                    if(delegate == null)
-                        throw Abort
-                }
-
-                return delegate?.safeCall { visitField(access, name, desc, signature, value) }
-            }
-        }
-        */
         val visitor = FieldStructureVisitor(this, environment, classId, fieldId, null)
 
         try {

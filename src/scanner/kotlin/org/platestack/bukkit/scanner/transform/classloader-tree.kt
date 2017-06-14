@@ -16,6 +16,7 @@
 
 package org.platestack.bukkit.scanner.transform
 
+import org.platestack.bukkit.boot.BootReflectionTarget
 import org.platestack.bukkit.scanner.rework.RemapEnvironment
 import java.net.URL
 import java.net.URLClassLoader
@@ -26,22 +27,13 @@ interface RemapEnvironmentHost {
     val environment: RemapEnvironment
 }
 
-@Deprecated("Moved to the boot module")
-class ScannerClassLoader(parent: ClassLoader?): ClassLoader(parent), RemapEnvironmentHost {
-    override val environment = RemapEnvironment((parent as? RemapEnvironmentHost)?.environment)
-}
-
-@Deprecated("Moved to the boot module")
-class RootClassLoader(modules: Array<URL>, urls: Array<URL>, parent: ScannerClassLoader): URLClassLoader(modules + urls, parent), RemapEnvironmentHost {
-    override val environment get() = (parent as ScannerClassLoader).environment
-}
-
-@Deprecated("Moved to the boot module")
-class CoreDependenciesClassLoader(urls: Array<URL>, parent: RootClassLoader): URLClassLoader(urls, parent), RemapEnvironmentHost {
-    override val environment get() = (parent.parent as ScannerClassLoader).environment
-}
-
+@BootReflectionTarget
 class MainClassLoader(urls: Array<URL>, parent: BootCoreDepsClassLoader): URLClassLoader(urls, parent), RemapEnvironmentHost {
     val coreDeps get() = parent as BootCoreDepsClassLoader
     override val environment get() = (parent.parent.parent as BootScannerClassLoader).environment as RemapEnvironment
+}
+
+@BootReflectionTarget
+class MainTransformerClassLoader(parent: MainClassLoader): RemapClassLoader(parent, parent.environment) {
+    val main get() = parent as MainClassLoader
 }

@@ -25,9 +25,4 @@ public class KotlinClassLoader extends URLClassLoader
     {
         super(urls, parent);
     }
-
-    public KotlinClassLoader(URL[] urls)
-    {
-        super(urls);
-    }
 }

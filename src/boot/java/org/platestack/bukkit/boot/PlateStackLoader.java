@@ -169,14 +169,6 @@ final public class PlateStackLoader extends JavaPlugin
             final ClassLoader kotlinClassLoader = classLoader;
 
             // Setup scanning class loader
-            /*
-            final Class<?> scanningClassLoaderClass = classLoader.loadClass("org.platestack.bukkit.scanner.transform.ScannerClassLoader");
-            if(classLoader != scanningClassLoaderClass.getClassLoader())
-                throw new IllegalStateException("The ScannerClassLoader class was not loaded by the right class loader! "+scanningClassLoaderClass.getClassLoader());
-
-            classLoader = (ClassLoader) scanningClassLoaderClass.getConstructor(ClassLoader.class).newInstance(classLoader);
-            final ClassLoader scanningClassLoader = classLoader;
-            */
             final ScannerClassLoader scanningClassLoader = new ScannerClassLoader(classLoader);
             classLoader = scanningClassLoader;
 
@@ -193,30 +185,6 @@ final public class PlateStackLoader extends JavaPlugin
             );
             apiJars.removeAll(kotlinJars);
 
-            /*
-            final Class<?> rootClassLoaderClass = classLoader.loadClass("org.platestack.bukkit.scanner.transform.RootClassLoader");
-            if(kotlinClassLoader != rootClassLoaderClass.getClassLoader())
-                throw new IllegalStateException("The RootClassLoader class was not loaded by the right class loader! "+rootClassLoaderClass.getClassLoader());
-
-            classLoader = (ClassLoader) rootClassLoaderClass.getConstructor(URL[].class, URL[].class, scanningClassLoaderClass)
-                    .newInstance(
-                            new URL[]{moduleApi},
-                            apiJars.stream()
-                                    .map(it-> (File) it)
-                                    .map(it ->
-                                    {
-                                        try
-                                        {
-                                            return it.toURI().toURL();
-                                        } catch(MalformedURLException e)
-                                        {
-                                            throw new RuntimeException(e);
-                                        }
-                                    })
-                                    .toArray(URL[]::new),
-                            scanningClassLoader
-                    );
-            */
             final RootClassLoader rootClassLoader = new RootClassLoader(
                     new URL[]{moduleApiUtil, moduleApi},
                     apiJars.stream()
@@ -249,24 +217,6 @@ final public class PlateStackLoader extends JavaPlugin
             apiJars.removeAll(kotlinJars);
             apiJars.removeAll(apiJars);
 
-            /*
-            final Class<?> coreDepsClass = classLoader.loadClass("org.platestack.bukkit.scanner.transform.CoreDependenciesClassLoader");
-            if(classLoader != coreDepsClass.getClassLoader())
-                throw new IllegalStateException("The CoreDependenciesClassLoader class was not loaded by the right class loader! "+coreDepsClass.getClassLoader());
-
-            classLoader = (ClassLoader) coreDepsClass
-                    .getConstructor(URL[].class, rootClassLoaderClass)
-                    .newInstance(coreJars.stream().map(it-> (File) it).map(it ->
-                    {
-                        try
-                        {
-                            return it.toURI().toURL();
-                        } catch(MalformedURLException e)
-                        {
-                            throw new RuntimeException(e);
-                        }
-                    }).toArray(URL[]::new), rootClassLoader);
-            */
             final CoreDependenciesClassLoader coreDepsClassLoader = new CoreDependenciesClassLoader(
                     Stream.concat(
                             coreJars.stream().map(it-> (File) it).map(it ->
@@ -318,24 +268,6 @@ final public class PlateStackLoader extends JavaPlugin
             final Class<?> plateBukkitClass = classLoader.loadClass("org.platestack.bukkit.server.PlateBukkit");
             if(classLoader != plateBukkitClass.getClassLoader())
                 throw new IllegalStateException("The PlateBukkit class was not loaded by our custom classloader which contains all the required libraries! "+initialResolverClass.getClassLoader());
-
-            /*
-            final Class<?> transformerClass = classLoader.loadClass("org.platestack.bukkit.server.mappings.BukkitTransformer");
-            if(classLoader != plateBukkitClass.getClassLoader())
-                throw new IllegalStateException("The BukkitTransformer object was not loaded by our custom classloader which contains all the required libraries! "+initialResolverClass.getClassLoader());
-
-            final Class<?> kotlin = classLoader.loadClass("kotlin.jvm.JvmClassMappingKt");
-            final Object transformerKClass = kotlin.getDeclaredMethod("getKotlinClass", Class.class).invoke(null, transformerClass);
-
-            final Class<?> transformerInterface = classLoader.loadClass("org.platestack.common.plugin.loader.Transformer");
-
-            final Object transformer = transformerInterface.cast(
-                transformerKClass.getClass().getMethod("getObjectInstance").invoke(transformerKClass)
-            );
-
-            transformerClass.getDeclaredMethod("initialize", ClassLoader.class, Logger.class)
-                    .invoke(transformer, classLoader, getLogger());
-            */
 
             final Constructor<?> constructor = plateBukkitClass.getDeclaredConstructor(JavaPlugin.class);
             final Object plateBukkit = constructor.newInstance(this);

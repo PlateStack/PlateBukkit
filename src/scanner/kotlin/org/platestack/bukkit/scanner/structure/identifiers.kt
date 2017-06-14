@@ -32,8 +32,7 @@ data class FieldIdentifier(val name: String): Identifier, Comparable<FieldIdenti
     override fun compareTo(other: FieldIdentifier) = name.compareTo(other.name)
 }
 
-private val validMethod = Regex("^\\((\\)V|(\\[*([BCDFIJSZ]|L[^;]+;))*\\)(V|\\[*([BCDFIJSZ]|L[^;]+;)))$")
-//private val validMethod = Regex("^\\((\\[?([BCDFIJSZ]|L[^;]+;))*\\)(V|\\[?([BCDFIJSZ]|L[^;]+;))$")
+private val validMethod = Regex("""^\((\)V|(\[*([BCDFIJSZ]|L[^;]+;))*\)(V|\[*([BCDFIJSZ]|L[^;]+;)))$""")
 
 /**
  * A method name and its descriptor
@@ -105,7 +104,7 @@ data class PackageIdentifier constructor(val parent: PackageIdentifier?, val nam
  *
  * @property package The package which this class resides
  * @property parent The class which nests this class or is referred by this class name before the actual name. The parent must have the same package as this class.
- * @property name The actual name of this class. Must contains the separation character.
+ * @property className The actual name of this class. Must contains the separation character.
  * @property fullSimpleName The combination of the parent's name with this name, excluding the package name
  * @property fullName The full name including the package and the parent name.
  */
@@ -127,8 +126,6 @@ data class ClassIdentifier(val `package`: PackageIdentifier, val parent: ClassId
         return ClassChange(
                 packageProvider(`package`).let { PackageMove(it.old, it.new) },
                 parent?.let { parentProvider(it) ?: it.toChange(packageProvider, parentProvider) },
-                //parent?.let { parentProvider(it) ?: ClassMove(it.toChange(packageProvider, parentProvider)) }
-                //        ?: ClassMove(null, null),
                 ClassName(className)
         )
     }

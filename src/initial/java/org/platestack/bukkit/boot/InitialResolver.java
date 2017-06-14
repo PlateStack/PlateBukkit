@@ -28,8 +28,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+@BootReflectionTarget
 public final class InitialResolver
 {
+    @BootReflectionTarget
     public static List<File> resolveKotlin(final JavaPlugin plugin, final List<InputStream> lists) throws IOException, ParseException
     {
         final Set<MavenArtifact> artifacts = readArtifacts(lists);
@@ -63,6 +65,7 @@ public final class InitialResolver
         return dependencies;
     }
 
+    @BootReflectionTarget
     public static List<File> resolve(final JavaPlugin plugin, final String requester, final List<InputStream> lists) throws IOException, ParseException
     {
         return resolveArtifacts(plugin, requester, readArtifacts(lists));

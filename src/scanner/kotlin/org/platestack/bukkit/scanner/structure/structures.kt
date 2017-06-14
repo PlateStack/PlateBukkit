@@ -68,7 +68,6 @@ class ClassStructure private constructor(var isInterface: Boolean?, val interfac
         operator fun invoke(
                 id: ClassIdentifier, `super`: ClassIdentifier?, isInterface: Boolean?, interfaces: Set<ClassIdentifier>,
                 packageProvider: ((PackageIdentifier) -> PackageMove)? = null,
-                parentProvider: ((ClassIdentifier) -> ClassMove?)? = null,
                 structureProvider: (ClassIdentifier) -> ClassStructure
         ): ClassStructure {
             synchronized(lock) {
@@ -92,24 +91,6 @@ class ClassStructure private constructor(var isInterface: Boolean?, val interfac
                             else {
                                 toChange { structureProvider(it).`class` }
                             }
-                            /*
-                            if(packageProvider != null) {
-                                if(parentProvider != null) {
-                                    //toChange(packageProvider, parentProvider)
-                                }
-                                else {
-                                    toChange(packageProvider)
-                                }
-                            }
-                            else {
-                                if(parentProvider != null) {
-                                    toChange(parentProvider = parentProvider)
-                                }
-                                else {
-                                    toChange()
-                                }
-                            }
-                            */
 
                     structure.`class` = id.create()
                     structure.`super` = `super`?.let(structureProvider)

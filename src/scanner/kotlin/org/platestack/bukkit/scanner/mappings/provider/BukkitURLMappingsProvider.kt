@@ -90,10 +90,6 @@ class BukkitURLMappingsProvider(val base: URL, val logger: Logger, val checkPack
             it.classes += mappings.classes.map { it.value.let { it.toNoPackage() to it } }
         }
 
-        fun ParameterDescriptor.isolated() : ParameterDescriptor = TODO()
-                //if(type == null) this
-                //else copy(type = type!!.deepCopy())
-
         /**
          * net/minecraft/server/v5/NiceName -> aaaa
          */

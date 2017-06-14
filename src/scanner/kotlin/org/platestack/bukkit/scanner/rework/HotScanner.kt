@@ -37,37 +37,6 @@ open class HotScanner(val classLoader: ClassLoader) : ClassScanner {
                 `class`.declaredMethods.map { MethodIdentifier(it.name, getMethodDescriptor(it)) }
         )
         return structure
-        /*
-        val structure = scan(environment, classId, true) ?: return null
-        val `class` = classLoader.loadClass(classId.hotName)
-        structure.isFull = true
-
-        `class`.declaredFields.forEach { field ->
-            val fieldId = FieldIdentifier(field.name)
-            val fieldStructure = checkNotNull(provide(environment, classId, fieldId))
-            structure.fields[fieldId] = fieldStructure
-        }
-
-        `class`.declaredMethods.forEach { method ->
-            val methodId = MethodIdentifier(method.name, getMethodDescriptor(method))
-            val methodStructure = checkNotNull(provide(environment, classId, methodId))
-            structure.methods[methodId] = methodStructure
-        }
-
-        structure.`super`?.let { sup ->
-            if(!sup.isFull) {
-                provideFull(environment, sup.`class`.from)
-            }
-        }
-
-        structure.interfaces.forEach {
-            if(!it.isFull) {
-                provideFull(environment, it.`class`.from)
-            }
-        }
-
-        return structure
-        */
     }
 
     override fun scan(environment: RemapEnvironment, classId: ClassIdentifier, fullParents: Boolean): ClassStructure? {
@@ -84,36 +53,6 @@ open class HotScanner(val classLoader: ClassLoader) : ClassScanner {
                 `class`.interfaces.map { ClassIdentifier(it.coldName) }.toSet(),
                 `class`.isInterface
         )
-        /*
-        val structure = ClassStructure(classId,
-                `class`.superclass?.let { ClassIdentifier(it.name.replace('.','/')) },
-                `class`.isInterface,
-                `class`.interfaces.map { ClassIdentifier(it.name.replace('.','/')) }.toSet(),
-                packageProvider = { provide(environment, it) },
-                parentProvider = {
-                    val parent = /* if(fullParents)
-                        provideFull(environment, it)
-                    else */
-                        provide(environment, it, fullParents)
-
-                    if(parent != null)
-                        ClassMove(parent.`class`)
-                    else {
-                        val fake = ClassStructure(it,
-                                null,
-                                null,
-                                emptySet(),
-                                structureProvider = { error("Unexpected call!") }
-                        )
-                        environment[it] = fake
-                        ClassMove(fake.`class`)
-                    }
-                },
-                structureProvider = { provide(environment, it, fullParents) ?: error("Referred class not found: $it ; Referred by: $`class`") }
-        )
-
-        return structure
-        */
     }
 
     private fun findVisibleMethod(from: Class<*>, current: Class<*>, methodName: String, parameters: Array<Class<*>>): Method? {
@@ -154,7 +93,7 @@ open class HotScanner(val classLoader: ClassLoader) : ClassScanner {
         val type = getType(methodId.descriptor)
         val name = methodId.name
         val parameters = type.argumentTypes.map { it.toClass() }.toTypedArray()
-        return /* `class`.tryApplyIgnoring(NoSuchMethodException::class) { getMethod(name, *parameters) } ?: */ findVisibleMethod(`class`, `class`, name, parameters)
+        return findVisibleMethod(`class`, `class`, name, parameters)
     }
 
     fun Method.findParentMethod(environment: RemapEnvironment, viewer: ClassIdentifier, from: Class<*>, methodId: MethodIdentifier): MethodStructure? {
@@ -209,7 +148,7 @@ open class HotScanner(val classLoader: ClassLoader) : ClassScanner {
     }
 
     private fun getVisibleField(`class`: Class<*>, fieldName: String): Field? {
-        return /* `class`.tryApplyIgnoring(NoSuchFieldException::class) { getField(fieldName) } ?: */ findVisibleField(`class`, `class`, fieldName)
+        return findVisibleField(`class`, `class`, fieldName)
     }
 
     override fun scan(environment: RemapEnvironment, classId: ClassIdentifier, fieldId: FieldIdentifier): FieldStructure? {

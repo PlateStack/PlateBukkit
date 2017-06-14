@@ -14,11 +14,18 @@
  *  limitations under the License.
  */
 
-package org.platestack.bukkit.server.mappings;
+package org.platestack.bukkit.boot;
 
-public class RealOwner extends Root
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+
+/**
+ * Indicates that the annotated element is used by reflection at boot time.
+ *
+ * Adjust your IDE to suppress unused warnings from elements which contains this annotation.
+ */
+@Retention(RetentionPolicy.CLASS)
+public @interface BootReflectionTarget
 {
-    public String requestedField;
-
-    RealOwner() { super(); }
+    boolean constructor = true;
 }

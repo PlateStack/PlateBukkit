@@ -41,11 +41,12 @@ data class MethodChange(val name: Name, val descriptorType: MethodDescriptor) : 
 
 /**
  * A package name
- * @property package The parent where this class resides
+ * @property parent The parent where this class resides
  * @property name The actual name of this package. Must contains not contains any separation character!
  */
 data class PackageChange(val parent: PackageChange?, var moveTo: PackageChange?, val name: PackageName) : Change {
     override val from: PackageIdentifier = PackageIdentifier(parent?.from, name.from)
+    @Suppress("RecursivePropertyAccessor")
     override val to: PackageIdentifier get() = PackageIdentifier(moveTo?.to, name.to)
     override fun toString() = "$from -> $to"
 }
@@ -78,15 +79,6 @@ data class PackageMove(override val old: PackageChange, override var new: Packag
 }
 
 /**
- * A migration from a class to an other
- */
-data class ClassMove(override val old: ClassChange?, override var new: ClassChange? = old) : Move {
-    override val from get() = old?.from
-    override val to get() = new?.to
-    override fun toString() = "$from -> $to"
-}
-
-/**
  * A full class name
  * @property package The package where this class resides
  * @property parent The class which nests this class or is referred by this class name before the actual name
@@ -94,6 +86,7 @@ data class ClassMove(override val old: ClassChange?, override var new: ClassChan
  */
 data class ClassChange(val `package`: PackageMove, var parent: ClassChange?, val name: ClassName) : Change {
     override val from: ClassIdentifier = ClassIdentifier(parent?.from?.`package` ?: `package`.from, parent?.from, name.from)
+    @Suppress("RecursivePropertyAccessor")
     override val to: ClassIdentifier get() = ClassIdentifier(parent?.to?.`package` ?: `package`.to, parent?.to, name.to)
     override fun toString() = "$from -> $to"
 }

@@ -139,22 +139,6 @@ interface ClassScanner {
                     isInterface,
                     interfaces,
                     packageProvider = { scanner.provide(environment, it) },
-                    parentProvider = {
-                        val parent = scanner.provide(environment, it, fullParents)
-
-                        if(parent != null)
-                            ClassMove(parent.`class`)
-                        else {
-                            val fake = ClassStructure(it,
-                                    null,
-                                    null,
-                                    emptySet(),
-                                    structureProvider = { error("Unexpected call!") }
-                            )
-                            environment[it] = fake
-                            ClassMove(fake.`class`)
-                        }
-                    },
                     structureProvider = { parentId ->
 
                         fun createFakeIntermediary(id: ClassIdentifier): ClassStructure {

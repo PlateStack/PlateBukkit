@@ -32,7 +32,7 @@ class Srg2NotchURLMappingsProvider(val base: URL, val logger: Logger) : Mappings
     override fun invoke(minecraftVersion: String, bukkitVersion: String, packageVersion: String): Mappings {
         val root = URL(base, "forge/")
         return load(URL(root, "$minecraftVersion/")).asSequence().map { it.inverse() }.reduce { acc, mappings ->
-            acc + mappings
+            TODO("Proper additive operation: acc + mappings") //TODO
         }.also {
             logger.info("The final mappings have ${it.classes.size} classes, ${it.fields.size} fields and ${it.methods.size} methods")
         }

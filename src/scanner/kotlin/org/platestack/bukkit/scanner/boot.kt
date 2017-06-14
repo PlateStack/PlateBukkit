@@ -18,6 +18,7 @@ package org.platestack.bukkit.scanner
 
 import org.bukkit.Bukkit
 import org.bukkit.plugin.java.JavaPlugin
+import org.platestack.bukkit.boot.BootReflectionTarget
 import org.platestack.bukkit.boot.RootClassLoader
 import org.platestack.bukkit.boot.ScannerClassLoader
 import org.platestack.bukkit.scanner.mappings.provider.BukkitURLMappingsProvider
@@ -30,6 +31,7 @@ import org.platestack.bukkit.scanner.structure.PackageMove
 import java.io.File
 import java.net.URL
 
+@BootReflectionTarget
 private fun boot(plugin: JavaPlugin, root: RootClassLoader) {
     val environment = RemapEnvironment()
     (root.parent as ScannerClassLoader).environment = environment
