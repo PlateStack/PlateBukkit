@@ -19,7 +19,6 @@ package org.platestack.bukkit.scanner.rework
 import org.objectweb.asm.Type
 import org.objectweb.asm.Type.*
 import org.platestack.bukkit.scanner.structure.*
-import org.platestack.util.tryApplyIgnoring
 import org.platestack.util.tryIgnoring
 import java.lang.reflect.Field
 import java.lang.reflect.Method
@@ -155,7 +154,7 @@ open class HotScanner(val classLoader: ClassLoader) : ClassScanner {
         val type = getType(methodId.descriptor)
         val name = methodId.name
         val parameters = type.argumentTypes.map { it.toClass() }.toTypedArray()
-        return `class`.tryApplyIgnoring(NoSuchMethodException::class) { getMethod(name, *parameters) } ?: findVisibleMethod(`class`, `class`, name, parameters)
+        return /* `class`.tryApplyIgnoring(NoSuchMethodException::class) { getMethod(name, *parameters) } ?: */ findVisibleMethod(`class`, `class`, name, parameters)
     }
 
     fun Method.findParentMethod(environment: RemapEnvironment, viewer: ClassIdentifier, from: Class<*>, methodId: MethodIdentifier): MethodStructure? {
@@ -210,7 +209,7 @@ open class HotScanner(val classLoader: ClassLoader) : ClassScanner {
     }
 
     private fun getVisibleField(`class`: Class<*>, fieldName: String): Field? {
-        return `class`.tryApplyIgnoring(NoSuchFieldException::class) { getField(fieldName) } ?: findVisibleField(`class`, `class`, fieldName)
+        return /* `class`.tryApplyIgnoring(NoSuchFieldException::class) { getField(fieldName) } ?: */ findVisibleField(`class`, `class`, fieldName)
     }
 
     override fun scan(environment: RemapEnvironment, classId: ClassIdentifier, fieldId: FieldIdentifier): FieldStructure? {

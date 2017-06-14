@@ -19,10 +19,53 @@ package org.platestack.bukkit.scanner.rework
 import org.platestack.bukkit.scanner.*
 import org.platestack.bukkit.scanner.mappings.Mappings
 import org.platestack.bukkit.scanner.structure.*
+import java.io.File
 
 class RemapEnvironment(val parent: RemapEnvironment? = null) {
-    val packages: Map<PackageToken, PackageMove> = mutableMapOf()
-    val classes: Map<ClassToken, ClassStructure> = mutableMapOf()
+    val packages: Map<PackageToken, PackageMove> = sortedMapOf()
+    val classes: Map<ClassToken, ClassStructure> = sortedMapOf()
+
+    fun export(dir: File) {
+        dir.mkdirs()
+        File(dir, "mappings.srg").writer().buffered().use { out->
+            packages.values.forEach { out.write("PK: ${it.from} ${it.to}\n") }
+            classes.values.forEach { out.write("CL: ${it.`class`.from} ${it.`class`.to}\n") }
+            classes.values.forEach { c ->
+                c.fields.values.forEach { out.write("FD: ${c.`class`.from}/${it.field.from} ${c.`class`.to}/${it.field.to}\n") }
+            }
+            classes.values.forEach { c ->
+                c.methods.values.forEach { out.write("MD: ${c.`class`.from}/${it.method.from} ${c.`class`.to}/${it.method.to}\n") }
+            }
+        }
+
+        File(dir, "structures.txt").writer().buffered().use { out->
+            classes.values.forEach { c ->
+                out.write("${c.`class`.from} -> ${c.`class`.to}\n")
+                out.write("| itf=${c.isInterface}\n")
+                out.write("| full=${c.isFull}\n")
+                out.write("| super=${c.`super`?.`class`?.let { "${it.from} -> ${it.to}" }} ${if(c.`super`?.isFull == true) "(full)" else "(partial)"}\n")
+                out.write("| interfaces=${c.interfaces.size}\n")
+                c.interfaces.forEach {
+                    out.write("| | ${it.`class`.from} -> ${it.`class`.to} ${if(it.`super`?.isFull == true) "(full)" else "(partial)"}\n")
+                }
+                out.write("| fields=${c.fields.size}\n")
+                c.fields.values.forEach {
+                    out.write("| | ${it.field.from} -> ${it.field.to}\n")
+                    out.write("| | | static=${it.static}\n")
+                    out.write("| | | access=${it.access}\n")
+                    out.write("| | | type=${it.descriptor?.from} -> ${it.descriptor?.to}\n")
+                    out.write("| | | owner=${it.owner}\n")
+                }
+                c.methods.values.forEach {
+                    out.write("| | ${it.method.from} -> ${it.method.to}\n")
+                    out.write("| | | static=${it.isStatic}\n")
+                    out.write("| | | access=${it.access}\n")
+                    out.write("| | | type=${it.method.descriptorType.from} -> ${it.method.descriptorType.to}\n")
+                    out.write("| | | owner=${it.owner}\n")
+                }
+            }
+        }
+    }
 
     fun applyToForeign(mappings: Mappings) {
         val packagesBefore = packages.values.associate { it.from to it.to }

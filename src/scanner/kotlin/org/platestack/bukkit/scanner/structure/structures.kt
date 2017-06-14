@@ -54,8 +54,8 @@ class ClassStructure private constructor(var isInterface: Boolean?, val interfac
     lateinit var `class`: ClassChange; private set
     var `super`: ClassStructure? = null; private set
 
-    val fields: MutableMap<FieldIdentifier, FieldStructure> = mutableMapOf() //HashMap()
-    val methods: MutableMap<MethodIdentifier, MethodStructure> = HashMap()
+    val fields: MutableMap<FieldIdentifier, FieldStructure> = sortedMapOf()
+    val methods: MutableMap<MethodIdentifier, MethodStructure> = sortedMapOf()
     var isFull = false
 
     constructor(`class`: ClassChange, `super`: ClassStructure?, isInterface: Boolean?, interfaces: Set<ClassStructure>): this(isInterface, interfaces) {

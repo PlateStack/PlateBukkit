@@ -33,7 +33,7 @@ public final class InitialResolver
     public static List<File> resolveKotlin(final JavaPlugin plugin, final List<InputStream> lists) throws IOException, ParseException
     {
         final Set<MavenArtifact> artifacts = readArtifacts(lists);
-        artifacts.removeIf(it-> !it.getGroup().equals("org.jetbrains.kotlin"));
+        artifacts.removeIf(it-> !it.getGroup().equals("org.jetbrains.kotlin") && !it.getGroup().equals("org.slf4j"));
         return resolveArtifacts(plugin, "plate-kotlin", artifacts);
     }
 

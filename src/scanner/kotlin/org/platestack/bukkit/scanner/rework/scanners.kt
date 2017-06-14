@@ -17,7 +17,6 @@
 package org.platestack.bukkit.scanner.rework
 
 import org.platestack.bukkit.scanner.structure.*
-import org.platestack.util.orElse
 
 /**
  * Object which can provide structural information about classes
@@ -156,22 +155,25 @@ interface ClassScanner {
                             ClassMove(fake.`class`)
                         }
                     },
-                    structureProvider = {
-                        scanner.provide(environment, it, fullParents).orElse {
-                            if(it.parent != null) {
-                                System.err.println("Creating fake structure for intermediary class: $it")
-                                val fake = ClassStructure(it.toChange(
+                    structureProvider = { parentId ->
+
+                        fun createFakeIntermediary(id: ClassIdentifier): ClassStructure {
+                            return if(id.parent != null) {
+                                System.err.println("Creating fake structure for intermediary class: $id")
+                                val fake = ClassStructure(id.toChange(
                                         packageProvider = { scanner.provide(environment, it) },
-                                        parentProvider = { checkNotNull(scanner.provide(environment, it, fullParents)) { TODO("Unsupported 2 class deep missing parent: $it") }.`class` }
+                                        parentProvider = { (scanner.provide(environment, it, fullParents) ?: createFakeIntermediary(it)).`class` }
                                 ), null, null, emptySet()).also {
                                     environment[it.`class`.from] = it
                                 }
                                 fake
                             }
                             else {
-                                error("Referred class not found: $it ; Referred by: $classId")
+                                error("Referred class not found: $id ; Referred by: $classId")
                             }
-                        }  }
+                        }
+
+                        scanner.provide(environment, parentId, fullParents) ?: createFakeIntermediary(parentId)  }
             )
 
             return structure

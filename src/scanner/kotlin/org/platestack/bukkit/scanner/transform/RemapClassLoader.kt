@@ -34,15 +34,20 @@ open class RemapClassLoader(parent: ClassLoader, parentEnvironment: RemapEnviron
 
     private val remapper = object : Remapper() {
         override fun map(typeName: String): String {
-            return scanner.provide(environment, ClassIdentifier(typeName))?.`class`?.to?.fullName ?: typeName
+            val result = scanner.provide(environment, ClassIdentifier(typeName))?.`class`?.to?.fullName ?: typeName
+            return result
         }
 
         override fun mapFieldName(owner: String, name: String, desc: String): String {
-            return scanner.provide(environment, ClassIdentifier(owner), FieldIdentifier(name))?.field?.to?.name ?: name
+            val result = scanner.provide(environment, ClassIdentifier(owner), FieldIdentifier(name))?.field?.to?.name ?: name
+            return result
         }
 
         override fun mapMethodName(owner: String, name: String, desc: String): String {
-            return scanner.provide(environment, ClassIdentifier(owner), MethodIdentifier(name, desc))?.method?.to?.name ?: name
+            val cid = ClassIdentifier(owner)
+            val fid = MethodIdentifier(name, desc)
+            val result = scanner.provide(environment, cid, fid)?.method?.to?.name ?: scanner.provide(environment, cid)?.find(fid)?.method?.to?.name ?: name
+            return result
         }
     }
 

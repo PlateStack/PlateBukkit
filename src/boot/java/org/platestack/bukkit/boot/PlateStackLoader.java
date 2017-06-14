@@ -113,7 +113,7 @@ final public class PlateStackLoader extends JavaPlugin
             final URL moduleInitial = modules[0];
             final URL moduleLibraryLoader = modules[1];
             final URL moduleMain = modules[2];
-            final URL moduleUtil = modules[3];
+            final URL moduleApiUtil = modules[3];
             final URL moduleScanner = modules[4];
             final URL moduleApi = modules[5];
             final URL moduleCommonUtil = modules[6];
@@ -218,7 +218,7 @@ final public class PlateStackLoader extends JavaPlugin
                     );
             */
             final RootClassLoader rootClassLoader = new RootClassLoader(
-                    new URL[]{moduleApi},
+                    new URL[]{moduleApiUtil, moduleApi},
                     apiJars.stream()
                             .map(it-> (File) it)
                             .map(it ->
@@ -279,7 +279,7 @@ final public class PlateStackLoader extends JavaPlugin
                                     throw new RuntimeException(e);
                                 }
                             }),
-                            Stream.of(moduleUtil, moduleScanner, moduleCommonUtil)
+                            Stream.of(moduleScanner, moduleCommonUtil, moduleLibraryLoader)
                     ).toArray(URL[]::new)
                     ,
                     rootClassLoader
@@ -295,6 +295,10 @@ final public class PlateStackLoader extends JavaPlugin
                     .getDeclaredMethod("boot", JavaPlugin.class, RootClassLoader.class);
             method.setAccessible(true);
             method.invoke(null, this, rootClassLoader);
+
+            // Export the mappings for debug reference
+            scanningClassLoader.getEnvironment().getClass().getDeclaredMethod("export", File.class)
+                    .invoke(scanningClassLoader.getEnvironment(), getDataFolder());
 
             // Setup main class loader
             final Class<?> mainClassLoaderClass = classLoader.loadClass("org.platestack.bukkit.scanner.transform.MainClassLoader");

@@ -24,6 +24,9 @@ import org.platestack.bukkit.scanner.mappings.provider.BukkitURLMappingsProvider
 import org.platestack.bukkit.scanner.mappings.provider.Srg2NotchURLMappingsProvider
 import org.platestack.bukkit.scanner.rework.HybridScanner
 import org.platestack.bukkit.scanner.rework.RemapEnvironment
+import org.platestack.bukkit.scanner.structure.ClassIdentifier
+import org.platestack.bukkit.scanner.structure.PackageIdentifier
+import org.platestack.bukkit.scanner.structure.PackageMove
 import java.io.File
 import java.net.URL
 
@@ -45,9 +48,24 @@ private fun boot(plugin: JavaPlugin, root: RootClassLoader) {
     val notch2craftMappings = bukkitProvider(minecraftVersion, bukkitVersion, packageVersion)
 
     val craft2notch = notch2craftMappings.inverse().toFullStructure(HybridScanner(root))
+    val normalNMS = PackageIdentifier("net/minecraft/server").toChange()
+    sequenceOf("MinecraftServer", "ServerStatisticManager")
+            .map { ClassIdentifier("net/minecraft/server/$packageVersion/$it") }
+            .map { checkNotNull(craft2notch[it]) { "Unable to fix the $it mapping." } }
+            .forEach {
+                it.`class`.`package`.new = normalNMS
+            }
+
+    craft2notch[normalNMS.from] = PackageMove(normalNMS)
+
+    requireNotNull(craft2notch[ClassIdentifier("net/minecraft/server/$packageVersion/MinecraftServer")])
+    craft2notch.export(File(plugin.dataFolder, "mappings/craft2notch"))
+
     val notch2srg = craft2notch.inverse().also { it.applyToNative(srg2notchMappings.inverse()) }
+    notch2srg.export(File(plugin.dataFolder, "mappings/notch2srg"))
 
     val srg2craft = notch2srg.inverse().also { it.applyToForeign(notch2craftMappings) }
+    srg2craft.export(File(plugin.dataFolder, "mappings/srg2craf"))
 
     environment.apply {
         (packages as MutableMap) += srg2craft.packages
