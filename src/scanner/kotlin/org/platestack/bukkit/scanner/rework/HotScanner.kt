@@ -146,7 +146,7 @@ open class HotScanner(val classLoader: ClassLoader) : ClassScanner {
             LONG -> java.lang.Long.TYPE
             DOUBLE -> java.lang.Double.TYPE
             OBJECT -> classLoader.loadClass(className)
-            ARRAY ->  java.lang.reflect.Array.newInstance(elementType.toClass(), 0).javaClass
+            ARRAY ->  java.lang.reflect.Array.newInstance(elementType.toClass(), *IntArray(dimensions)).javaClass
             else -> throw UnsupportedOperationException("Unknown type: $sort - $this")
         }
     }

@@ -112,7 +112,9 @@ interface ClassScanner {
             }
 
             methods.forEach { methodId ->
-                val methodStructure = checkNotNull(scanner.provide(environment, classId, methodId))
+                val methodStructure = checkNotNull(scanner.provide(environment, classId, methodId)) {
+                    "Couldn't find the method $classId#$methodId"
+                }
                 structure.methods[methodId] = methodStructure
             }
 
