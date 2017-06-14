@@ -36,7 +36,7 @@ import org.platestack.bukkit.boot.PlateStackLoader
 import org.platestack.bukkit.message.BukkitTranslator
 import org.platestack.bukkit.plugin.BukkitNamespace
 import org.platestack.common.plugin.loader.CommonLoader
-import org.platestack.common.plugin.loader.Transformer
+import org.platestack.common.transform.Transformer
 import org.platestack.libraryloader.ivy.LibraryResolver
 import org.platestack.structure.immutable.immutableSetOf
 import java.io.File

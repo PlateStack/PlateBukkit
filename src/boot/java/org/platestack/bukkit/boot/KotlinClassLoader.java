@@ -18,19 +18,16 @@ package org.platestack.bukkit.boot;
 
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.util.Arrays;
-import java.util.stream.Stream;
 
-public class RootClassLoader extends URLClassLoader implements EnvironmentHost
+public class KotlinClassLoader extends URLClassLoader
 {
-    public RootClassLoader(URL[] modules, URL[] urls, ScannerClassLoader parent)
+    public KotlinClassLoader(URL[] urls, ClassLoader parent)
     {
-        super(Stream.concat(Arrays.stream(modules), Arrays.stream(urls)).toArray(URL[]::new), parent);
+        super(urls, parent);
     }
 
-    @Override
-    public Object getEnvironment()
+    public KotlinClassLoader(URL[] urls)
     {
-        return ((ScannerClassLoader) getParent()).getEnvironment();
+        super(urls);
     }
 }

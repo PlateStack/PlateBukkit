@@ -30,19 +30,21 @@ import java.util.Set;
 
 public final class InitialResolver
 {
-    public static List<File> resolve(JavaPlugin plugin, List<InputStream> lists) throws IOException, ParseException
+    public static List<File> resolveKotlin(final JavaPlugin plugin, final List<InputStream> lists) throws IOException, ParseException
     {
+        final Set<MavenArtifact> artifacts = readArtifacts(lists);
+        artifacts.removeIf(it-> !it.getGroup().equals("org.jetbrains.kotlin"));
+        return resolveArtifacts(plugin, "plate-kotlin", artifacts);
+    }
+
+    public static Set<MavenArtifact> readArtifacts(final List<InputStream> lists) throws IOException
+    {
+        final Set<MavenArtifact> dependencies;
         try
         {
-            LibraryResolver.setUserDir(new File(plugin.getDataFolder(), "libs").getAbsoluteFile());
-            final Set<MavenArtifact> dependencies = new HashSet<>();
+            dependencies = new HashSet<>();
             for (InputStream listPath : lists)
                 dependencies.addAll(LibraryResolver.readArtifacts(listPath));
-
-            return LibraryResolver.getInstance().resolve(
-                    new MavenArtifact("org.platestack", "plate-bukkit", plugin.getDescription().getVersion()),
-                    dependencies
-            );
         }
         finally
         {
@@ -57,6 +59,23 @@ public final class InitialResolver
                 }
             });
         }
+
+        return dependencies;
+    }
+
+    public static List<File> resolve(final JavaPlugin plugin, final String requester, final List<InputStream> lists) throws IOException, ParseException
+    {
+        return resolveArtifacts(plugin, requester, readArtifacts(lists));
+    }
+
+    public static List<File> resolveArtifacts(final JavaPlugin plugin, String requester, final Set<MavenArtifact> dependencies) throws IOException, ParseException
+    {
+        LibraryResolver.setUserDir(new File(plugin.getDataFolder(), "libs").getAbsoluteFile());
+
+        return LibraryResolver.getInstance().resolve(
+                new MavenArtifact("org.platestack", requester, plugin.getDescription().getVersion()),
+                dependencies
+        );
     }
 
     private InitialResolver() {}

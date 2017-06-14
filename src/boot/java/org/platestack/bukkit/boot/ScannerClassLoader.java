@@ -16,21 +16,23 @@
 
 package org.platestack.bukkit.boot;
 
-import java.net.URL;
-import java.net.URLClassLoader;
-import java.util.Arrays;
-import java.util.stream.Stream;
-
-public class RootClassLoader extends URLClassLoader implements EnvironmentHost
+public class ScannerClassLoader extends ClassLoader implements EnvironmentHost
 {
-    public RootClassLoader(URL[] modules, URL[] urls, ScannerClassLoader parent)
+    private Object environment;
+
+    public ScannerClassLoader(ClassLoader parent)
     {
-        super(Stream.concat(Arrays.stream(modules), Arrays.stream(urls)).toArray(URL[]::new), parent);
+        super(parent);
     }
 
     @Override
     public Object getEnvironment()
     {
-        return ((ScannerClassLoader) getParent()).getEnvironment();
+        return environment;
+    }
+
+    public void setEnvironment(Object environment)
+    {
+        this.environment = environment;
     }
 }

@@ -36,6 +36,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -51,6 +52,7 @@ final public class PlateStackLoader extends JavaPlugin
     {
         try
         {
+            // Setup the variables and download ivy
             final String ivyVersion = "2.4.0";
             final String ivyJar = "ivy-"+ivyVersion+".jar";
             final String ivyMd5 = ivyJar+".md5";
@@ -103,14 +105,23 @@ final public class PlateStackLoader extends JavaPlugin
                     throw new IllegalStateException("Failed to download the ivy library, impossible to continue.");
             }
 
-            final URL[] modules = Stream.of("initial", "library-loader", "main")
+            // Setup the initial class loader
+            final URL[] modules = Stream.of("initial", "library-loader", "main", "api-util", "scanner", "api", "common-util")
                     .map(it-> "/META-INF/modules/"+it+"/")
                     .map(it-> Objects.requireNonNull(getClass().getResource(it), "Missing the internal file: "+it))
                     .toArray(URL[]::new);
 
+            final URL moduleInitial = modules[0];
+            final URL moduleLibraryLoader = modules[1];
+            final URL moduleMain = modules[2];
+            final URL moduleUtil = modules[3];
+            final URL moduleScanner = modules[4];
+            final URL moduleApi = modules[5];
+            final URL moduleCommonUtil = modules[6];
+
             final URL ivyUrl = ivyJarLocal.toUri().toURL();
             ClassLoader classLoader = new URLClassLoader(
-                    new URL[]{ modules[0], modules[1], ivyUrl },
+                    new URL[]{ moduleInitial, moduleLibraryLoader, ivyUrl },
                     getClassLoader()
             );
 
@@ -118,32 +129,189 @@ final public class PlateStackLoader extends JavaPlugin
             if(classLoader != initialResolverClass.getClassLoader())
                 throw new IllegalStateException("The InitialResolver class was not loaded by our custom classloader which contains the ivy library! "+initialResolverClass.getClassLoader());
 
-            getLogger().info("Downloading libraries required by the PlateStack platform...");
-            final Method resolveMethod = initialResolverClass.getDeclaredMethod("resolve", JavaPlugin.class, List.class);
+            // Setup kotlin class loader
+            getLogger().info("Downloading kotlin...");
+            final Method resolveKotlinMethod = initialResolverClass.getDeclaredMethod("resolveKotlin", JavaPlugin.class, List.class);
+            final List<String> libraryListFiles =
+                    Stream.of("common", "bukkit")
+                            .map(it-> "/META-INF/modules/main/org/platestack/"+it+"/libraries.list").collect(Collectors.toList());
+            libraryListFiles.add("/META-INF/modules/api/org/platestack/api/libraries.list");
 
-            final List<?> jars = (List<?>) resolveMethod.invoke(null, this,
-                    Stream.of("api", "common", "bukkit")
+            final List<?> kotlinJars = (List<?>) resolveKotlinMethod.invoke(null, this,
+                    libraryListFiles.stream()
                             .map(it->
                                     Objects.requireNonNull(getClass().getResourceAsStream(
-                                            "/META-INF/modules/main/org/platestack/"+it+"/libraries.list"
+                                            it
                                     ), "Missing file: "+it )
                             ).collect(Collectors.toList())
             );
 
-            classLoader = new RootClassLoader(this, new URL[]{modules[1], modules[2]}, getClassLoader(), jars.stream().map(it-> (File) it)
-                    .map(file ->
+            classLoader =
+                    new KotlinClassLoader(
+                            Stream.concat(
+                                    kotlinJars.stream()
+                                            .map(it-> (File) it)
+                                            .map(file ->
+                                            {
+                                                try
+                                                {
+                                                    return file.toURI().toURL();
+                                                } catch(MalformedURLException e)
+                                                {
+                                                    throw new RuntimeException(e);
+                                                }
+                                            }),
+                                    //Stream.of(moduleUtil, moduleScanner, moduleCommonUtil)
+                                    Stream.empty()
+                            )
+                            .toArray(URL[]::new),
+                            getClassLoader()
+                    );
+            final ClassLoader kotlinClassLoader = classLoader;
+
+            // Setup scanning class loader
+            /*
+            final Class<?> scanningClassLoaderClass = classLoader.loadClass("org.platestack.bukkit.scanner.transform.ScannerClassLoader");
+            if(classLoader != scanningClassLoaderClass.getClassLoader())
+                throw new IllegalStateException("The ScannerClassLoader class was not loaded by the right class loader! "+scanningClassLoaderClass.getClassLoader());
+
+            classLoader = (ClassLoader) scanningClassLoaderClass.getConstructor(ClassLoader.class).newInstance(classLoader);
+            final ClassLoader scanningClassLoader = classLoader;
+            */
+            final ScannerClassLoader scanningClassLoader = new ScannerClassLoader(classLoader);
+            classLoader = scanningClassLoader;
+
+            // Setup root class loader
+            final Method resolveMethod = initialResolverClass.getDeclaredMethod("resolve", JavaPlugin.class, String.class, List.class);
+            getLogger().info("Downloading libraries required by the PlateStack API...");
+
+            final List<?> apiJars = (List<?>) resolveMethod.invoke(null, this, "plate-api",
+                    Collections.singletonList(
+                            Objects.requireNonNull(getClass().getResourceAsStream(
+                                    "/META-INF/modules/api/org/platestack/api/libraries.list"
+                            ), "Missing file: /META-INF/modules/api/org/platestack/api/libraries.list" )
+                    )
+            );
+            apiJars.removeAll(kotlinJars);
+
+            /*
+            final Class<?> rootClassLoaderClass = classLoader.loadClass("org.platestack.bukkit.scanner.transform.RootClassLoader");
+            if(kotlinClassLoader != rootClassLoaderClass.getClassLoader())
+                throw new IllegalStateException("The RootClassLoader class was not loaded by the right class loader! "+rootClassLoaderClass.getClassLoader());
+
+            classLoader = (ClassLoader) rootClassLoaderClass.getConstructor(URL[].class, URL[].class, scanningClassLoaderClass)
+                    .newInstance(
+                            new URL[]{moduleApi},
+                            apiJars.stream()
+                                    .map(it-> (File) it)
+                                    .map(it ->
+                                    {
+                                        try
+                                        {
+                                            return it.toURI().toURL();
+                                        } catch(MalformedURLException e)
+                                        {
+                                            throw new RuntimeException(e);
+                                        }
+                                    })
+                                    .toArray(URL[]::new),
+                            scanningClassLoader
+                    );
+            */
+            final RootClassLoader rootClassLoader = new RootClassLoader(
+                    new URL[]{moduleApi},
+                    apiJars.stream()
+                            .map(it-> (File) it)
+                            .map(it ->
+                            {
+                                try
+                                {
+                                    return it.toURI().toURL();
+                                } catch(MalformedURLException e)
+                                {
+                                    throw new RuntimeException(e);
+                                }
+                            })
+                            .toArray(URL[]::new),
+                    scanningClassLoader
+            );
+            classLoader = rootClassLoader;
+
+            // Setup core dependencies class loader
+            getLogger().info("Downloading libraries required by the PlateStack Bukkit and Common...");
+            final List<?> coreJars = (List<?>) resolveMethod.invoke(null, this, "plate-bukkit",
+                    Stream.of("common", "bukkit").map(it->
+                            Objects.requireNonNull(getClass().getResourceAsStream(
+                                    "/META-INF/modules/main/org/platestack/"+it+"/libraries.list"
+                            ), "Missing file: /META-INF/modules/main/org/platestack/"+it+"/libraries.list" )
+                    )
+                    .collect(Collectors.toList())
+            );
+            apiJars.removeAll(kotlinJars);
+            apiJars.removeAll(apiJars);
+
+            /*
+            final Class<?> coreDepsClass = classLoader.loadClass("org.platestack.bukkit.scanner.transform.CoreDependenciesClassLoader");
+            if(classLoader != coreDepsClass.getClassLoader())
+                throw new IllegalStateException("The CoreDependenciesClassLoader class was not loaded by the right class loader! "+coreDepsClass.getClassLoader());
+
+            classLoader = (ClassLoader) coreDepsClass
+                    .getConstructor(URL[].class, rootClassLoaderClass)
+                    .newInstance(coreJars.stream().map(it-> (File) it).map(it ->
                     {
                         try
                         {
-                            return file.toURI().toURL();
+                            return it.toURI().toURL();
                         } catch(MalformedURLException e)
                         {
                             throw new RuntimeException(e);
                         }
-                    })
-                    .toArray(URL[]::new)
+                    }).toArray(URL[]::new), rootClassLoader);
+            */
+            final CoreDependenciesClassLoader coreDepsClassLoader = new CoreDependenciesClassLoader(
+                    Stream.concat(
+                            coreJars.stream().map(it-> (File) it).map(it ->
+                            {
+                                try
+                                {
+                                    return it.toURI().toURL();
+                                } catch(MalformedURLException e)
+                                {
+                                    throw new RuntimeException(e);
+                                }
+                            }),
+                            Stream.of(moduleUtil, moduleScanner, moduleCommonUtil)
+                    ).toArray(URL[]::new)
+                    ,
+                    rootClassLoader
             );
+            classLoader = coreDepsClassLoader;
 
+            // Setup SRG -> CraftBukkit remap environment
+            final Class<?> bootClass = classLoader.loadClass("org.platestack.bukkit.scanner.Boot");
+            if(classLoader != bootClass.getClassLoader())
+                throw new IllegalStateException("The Boot class was not loaded by the right class loader! "+bootClass.getClassLoader());
+
+            final Method method = bootClass
+                    .getDeclaredMethod("boot", JavaPlugin.class, RootClassLoader.class);
+            method.setAccessible(true);
+            method.invoke(null, this, rootClassLoader);
+
+            // Setup main class loader
+            final Class<?> mainClassLoaderClass = classLoader.loadClass("org.platestack.bukkit.scanner.transform.MainClassLoader");
+            if(classLoader != mainClassLoaderClass.getClassLoader())
+                throw new IllegalStateException("The MainClassLoader class was not loaded by the right class loader! "+mainClassLoaderClass.getClassLoader());
+
+            classLoader = (ClassLoader) mainClassLoaderClass
+                    .getConstructor(URL[].class, CoreDependenciesClassLoader.class)
+                    .newInstance(new URL[]{moduleMain}, coreDepsClassLoader);
+
+            // Setup main transformer class loader
+            classLoader = (ClassLoader) rootClassLoader.loadClass("org.platestack.bukkit.scanner.transform.MainTransformerClassLoader")
+                    .getConstructor(mainClassLoaderClass)
+                    .newInstance(classLoader);
+
+            // Initialize PlateBukkit
             final Class<?> plateBukkitClass = classLoader.loadClass("org.platestack.bukkit.server.PlateBukkit");
             if(classLoader != plateBukkitClass.getClassLoader())
                 throw new IllegalStateException("The PlateBukkit class was not loaded by our custom classloader which contains all the required libraries! "+initialResolverClass.getClassLoader());

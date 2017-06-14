@@ -91,7 +91,8 @@ dependencies {
     compileInitial project(':library-loader')
 
     compileScanner sourceSets.boot.output
-    compileScanner project(path: ':plate-api', configuration: 'util')
+    //compileScanner project(path: ':plate-api', configuration: 'util')
+    compileScanner project(path: ':plate-common', configuration: 'util')
     compileScanner "org.jetbrains.kotlin:kotlin-stdlib-jre8:$kotlin_version"
     compileScanner "org.jetbrains.kotlin:kotlin-reflect:$kotlin_version"
     compileScanner 'org.ow2.asm:asm-tree:5.2'
@@ -134,13 +135,24 @@ task bootJar(type: Jar, dependsOn: [':initialClasses', ':classes', ':plate-commo
 
         into('main') {
             from sourceSets.main.output
-            from { project(':plate-api:immutable-collections').sourceSets.main.output }
             from { project(':plate-common').sourceSets.main.output }
+        }
+
+        into('api') {
             from { project(':plate-api').sourceSets.main.output }
         }
 
-        into('util') {
+        into('api-util') {
+            from { project(':plate-api:immutable-collections').sourceSets.main.output }
             from { project(':plate-api').sourceSets.util.output }
+        }
+
+        into('common-util') {
+            from { project(':plate-common').sourceSets.util.output }
+        }
+
+        into('scanner') {
+            from sourceSets.scanner.output
         }
     }
 

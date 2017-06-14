@@ -20,7 +20,7 @@ import org.platestack.bukkit.scanner.*
 import org.platestack.bukkit.scanner.mappings.Mappings
 import org.platestack.bukkit.scanner.structure.*
 
-class RemapEnvironment {
+class RemapEnvironment(val parent: RemapEnvironment? = null) {
     val packages: Map<PackageToken, PackageMove> = mutableMapOf()
     val classes: Map<ClassToken, ClassStructure> = mutableMapOf()
 
@@ -268,9 +268,9 @@ class RemapEnvironment {
         return inverse
     }
 
-    operator fun get(`package`: PackageToken) = packages[`package`]
+    operator fun get(`package`: PackageToken): PackageMove? = packages[`package`] ?: parent?.get(`package`)
 
-    operator fun get(`class`: ClassToken) = classes[`class`]
+    operator fun get(`class`: ClassToken): ClassStructure? = classes[`class`] ?: parent?.get(`class`)
 
     operator fun set(`class`: ClassToken, structure: ClassStructure) {
         (classes as MutableMap)[`class`] = structure

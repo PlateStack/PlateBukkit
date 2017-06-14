@@ -28,7 +28,7 @@ import org.platestack.bukkit.scanner.MappingsProvider
 import org.platestack.bukkit.scanner.mappings.Mappings
 import org.platestack.bukkit.scanner.structure.ClassIdentifier
 import org.platestack.bukkit.scanner.structure.ClassStructure
-import org.platestack.common.plugin.loader.Transformer
+import org.platestack.common.transform.Transformer
 import org.platestack.util.UniqueModification
 import java.io.File
 import java.io.InputStream
