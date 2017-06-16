@@ -68,6 +68,7 @@ class PlateBukkit(
         translator = BukkitTranslator()
         Minecraft = object : MinecraftServer {
             override val version = Version.parse(Bukkit.getBukkitVersion())
+            override val instance = server.javaClass.getDeclaredMethod("getServer").invoke(server)
         }
 
         loader.setAPI(PlateMetadata(
