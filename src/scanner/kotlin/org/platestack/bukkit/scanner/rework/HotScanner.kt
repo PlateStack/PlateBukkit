@@ -64,7 +64,7 @@ open class HotScanner(val classLoader: ClassLoader) : ClassScanner {
             declared.takeIf {
                 when {
                     isStatic(mod) || isPrivate(mod) -> from == current
-                    //isPublic(mod) -> true // Not needed here but would be needed if this method was public
+                    isPublic(mod) -> true // Not needed here but would be needed if this method was public
                     isProtected(mod) -> true // Assumes that from is an instance of current
                     else -> from.`package` == current.`package`
                 }
@@ -97,19 +97,23 @@ open class HotScanner(val classLoader: ClassLoader) : ClassScanner {
     }
 
     fun Method.findParentMethod(environment: RemapEnvironment, viewer: ClassIdentifier, from: Class<*>, methodId: MethodIdentifier): MethodStructure? {
-        val parents = (sequenceOf(from.superclass) + from.interfaces.asSequence()).filterNotNull()
-        val parentMethod = parents.map { provide(environment, ClassIdentifier(it.coldName), methodId) }.filterNotNull().firstOrNull()
-        if(parentMethod != null && parentMethod.isStatic == false) {
-            if(when(parentMethod.access) {
-                AccessLevel.PRIVATE -> false
-                AccessLevel.INTERNAL -> parentMethod.owner.`package`.from == viewer.`package`
-                AccessLevel.PROTECTED, AccessLevel.PUBLIC, AccessLevel.UNKNOWN -> true
-            }) {
-                return parentMethod
-            }
-        }
+        val parents = (from.interfaces.asSequence() + sequenceOf(from.superclass)).filterNotNull()
+        val parentMethod = parents
+                .map {
+                    val coldId = ClassIdentifier(it.coldName)
+                    provide(environment, coldId, methodId) ?: provide(environment, coldId)?.find(methodId)
+                }
+                .filterNotNull()
+                .filterNot { it.isStatic == true }
+                .filter { when(it.access) {
+                    AccessLevel.PRIVATE -> false
+                    AccessLevel.INTERNAL -> it.owner.`package`.from == viewer.`package`
+                    AccessLevel.PROTECTED, AccessLevel.PUBLIC, AccessLevel.UNKNOWN -> true
+                } }
+                .firstOrNull()
 
-        return null
+
+        return parentMethod
     }
 
     override fun scan(environment: RemapEnvironment, classId: ClassIdentifier, methodId: MethodIdentifier): MethodStructure? {
@@ -139,7 +143,7 @@ open class HotScanner(val classLoader: ClassLoader) : ClassScanner {
             declared.takeIf {
                 when {
                     isStatic(mod) || isPrivate(mod) -> from == current
-                    //isPublic(mod) -> true // Not needed here but would be needed if this method was public
+                    isPublic(mod) -> true // Not needed here but would be needed if this method was public
                     isProtected(mod) -> true // Assumes that from is an instance of current
                     else -> from.`package` == current.`package`
                 }

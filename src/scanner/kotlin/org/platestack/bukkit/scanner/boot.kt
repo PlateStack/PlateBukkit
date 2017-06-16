@@ -66,6 +66,42 @@ private fun boot(plugin: JavaPlugin, root: RootClassLoader) {
     val notch2srg = craft2notch.inverse().also { it.applyToNative(srg2notchMappings.inverse()) }
     notch2srg.export(File(plugin.dataFolder, "mappings/notch2srg"))
 
+    val switchTableField = Regex("^\\\$SWITCH_TABLE\\$.+$")
+    val accessMethod = Regex("^access\\$\\d+$")
+    val enumClass = ClassIdentifier("java/lang/Enum")
+    val thisReferenceField = Regex("^this\\$.+$")
+    notch2srg.classes.forEach { c ->
+        if(c.value.`class`.`package`.to.fullName.contains("src")) {
+            plugin.logger.severe("Notch->SRG: Found a class with 'src' in package. This might be an error: ${c.value.`class`}")
+        }
+        val enum = c.value.`super`?.`class`?.from == enumClass
+        c.value.fields.forEach {
+            val to = it.value.field.name.to
+            when {
+                enum && (to == "\$VALUES" || (it.value.static == true && it.value.descriptor?.type == c.value.`class`)) -> Unit
+                to.matches(switchTableField) -> Unit
+                to.matches(Srg2NotchURLMappingsProvider.fieldNamePattern) -> Unit
+                to.matches(thisReferenceField) -> Unit
+                else ->
+                    plugin.logger.severe("Notch->SRG: Found a field witch doesn't matches the SRG naming pattern: ${it.value.owner} # ${it.value.field}")
+            }
+        }
+        c.value.methods.forEach {
+            val to = it.value.method.name.to
+            when(to) {
+                "toString", "hashcode", "clone", "finalize" -> Unit
+                else -> when {
+                    to.matches(accessMethod) -> Unit
+                    enum && (to == "valueOf" || to == "values") -> Unit
+                    to.matches(switchTableField) -> Unit
+                    to.matches(Srg2NotchURLMappingsProvider.methodNamePattern) -> Unit
+                    else ->
+                        plugin.logger.severe("Notch->SRG: Found a method witch doesn't matches the SRG naming pattern: ${it.value.owner} # ${it.value.method}")
+                }
+            }
+        }
+    }
+
     val srg2craft = notch2srg.inverse().also { it.applyToForeign(notch2craftMappings) }
     srg2craft.export(File(plugin.dataFolder, "mappings/srg2craf"))
 

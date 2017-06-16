@@ -29,6 +29,11 @@ import kotlin.streams.asSequence
 import kotlin.streams.toList
 
 class Srg2NotchURLMappingsProvider(val base: URL, val logger: Logger) : MappingsProvider {
+    companion object {
+        val fieldNamePattern = Regex("^field_\\d+_\\w+$")
+        val methodNamePattern = Regex("^func_\\d+_\\w+$")
+    }
+
     override fun invoke(minecraftVersion: String, bukkitVersion: String, packageVersion: String): Mappings {
         val root = URL(base, "forge/")
         return load(URL(root, "$minecraftVersion/")).asSequence().map { it.inverse() }.reduce { acc, mappings ->

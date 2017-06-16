@@ -20,12 +20,14 @@ import org.objectweb.asm.ClassReader
 import org.objectweb.asm.ClassWriter
 import org.objectweb.asm.commons.ClassRemapper
 import org.objectweb.asm.commons.Remapper
+import org.platestack.bukkit.scanner.mappings.provider.Srg2NotchURLMappingsProvider
 import org.platestack.bukkit.scanner.rework.RemapEnvironment
 import org.platestack.bukkit.scanner.rework.ResourceLoaderScanner
 import org.platestack.bukkit.scanner.structure.ClassIdentifier
 import org.platestack.bukkit.scanner.structure.FieldIdentifier
 import org.platestack.bukkit.scanner.structure.MethodIdentifier
 import org.platestack.common.transform.TransformingClassLoader
+import java.io.File
 import java.io.InputStream
 
 open class RemapClassLoader(parent: ClassLoader, parentEnvironment: RemapEnvironment): TransformingClassLoader(parent), RemapEnvironmentHost {
@@ -39,14 +41,28 @@ open class RemapClassLoader(parent: ClassLoader, parentEnvironment: RemapEnviron
         }
 
         override fun mapFieldName(owner: String, name: String, desc: String): String {
-            val result = scanner.provide(environment, ClassIdentifier(owner), FieldIdentifier(name))?.field?.to?.name ?: name
+            val cid = ClassIdentifier(owner)
+            val fid = FieldIdentifier(name)
+            val result = scanner.provide(environment, cid, fid)?.field?.to?.name ?: scanner.provide(environment, cid)?.find(fid)?.field?.name?.to ?: name
+            if(Srg2NotchURLMappingsProvider.fieldNamePattern.matches(result))
+                NoSuchFieldError("The field $name was remapped to a SRG name \"$result\". " +
+                        "This indicates that the original field is not available on this server " +
+                        "or has been incorrectly analyzed by the remapper. Field: $owner#$name $desc"
+                ).printStackTrace()
+
             return result
         }
 
         override fun mapMethodName(owner: String, name: String, desc: String): String {
             val cid = ClassIdentifier(owner)
-            val fid = MethodIdentifier(name, desc)
-            val result = scanner.provide(environment, cid, fid)?.method?.to?.name ?: scanner.provide(environment, cid)?.find(fid)?.method?.to?.name ?: name
+            val mid = MethodIdentifier(name, desc)
+            val result = scanner.provide(environment, cid, mid)?.method?.to?.name ?: scanner.provide(environment, cid)?.find(mid)?.method?.name?.to ?: name
+            if(Srg2NotchURLMappingsProvider.methodNamePattern.matches(result))
+                NoSuchFieldError("The method $name was remapped to a SRG name \"$result\". " +
+                        "This indicates that the original method is not available on this server " +
+                        "or has been incorrectly analyzed by the remapper. Method: $owner#$name $desc"
+                ).printStackTrace()
+
             return result
         }
     }
@@ -61,6 +77,8 @@ open class RemapClassLoader(parent: ClassLoader, parentEnvironment: RemapEnviron
             }
         }
 
-        return writer.toByteArray()
+        return writer.toByteArray().also {
+            File("classes/$name.class").also { it.parentFile.mkdirs() }.outputStream().buffered().use { out -> out.write(it) }
+        }
     }
 }

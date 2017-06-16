@@ -208,19 +208,21 @@ interface ColdScanner : ClassScanner {
         }
 
         fun findMethodOwner(scanner: ClassScanner, environment: RemapEnvironment, classId: ClassIdentifier, superclass: ClassIdentifier?, interfaceIds: Set<ClassIdentifier>, methodId: MethodIdentifier): MethodStructure? {
-            val parents = (sequenceOf(superclass) + checkNotNull(interfaceIds).asSequence()).filterNotNull()
-            val parentMethod = parents.map { scanner.provide(environment, it, methodId) }.filterNotNull().firstOrNull()
-            if(parentMethod != null && parentMethod.isStatic == false) {
-                if(when(parentMethod.access) {
-                    PRIVATE -> false
-                    INTERNAL -> parentMethod.owner.`package`.from == classId.`package`
-                    PROTECTED, PUBLIC, UNKNOWN -> true
-                }) {
-                    return parentMethod
-                }
-            }
+            val parents = (checkNotNull(interfaceIds).asSequence() + sequenceOf(superclass)).filterNotNull()
+            val parentMethod = parents
+                    .map {
+                        scanner.provide(environment, it, methodId) ?: scanner.provide(environment, classId)?.find(methodId)
+                    }
+                    .filterNotNull()
+                    .filterNot { it.isStatic == true }
+                    .filter { when(it.access) {
+                        PRIVATE -> false
+                        INTERNAL -> it.owner.`package`.from == classId.`package`
+                        PROTECTED, PUBLIC, UNKNOWN -> true
+                    } }
+                    .firstOrNull()
 
-            return null
+            return parentMethod
         }
 
         fun buildMethodStructures(
