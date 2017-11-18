@@ -17,11 +17,14 @@
 package org.platestack.bukkit.plugin
 
 import org.bukkit.Bukkit
+import org.platestack.api.cmd.CommandRegistry
 import org.platestack.api.plugin.PluginNamespace
+import org.platestack.bukkit.cmd.BukkitCommandRegistry
 
 object BukkitNamespace: PluginNamespace {
     private val objects = mutableMapOf<String, BukkitPlugin>()
     override val id: String get() = "bukkit"
+    override val commandRegistry: CommandRegistry get() = BukkitCommandRegistry
 
     override fun get(pluginId: String): BukkitPlugin? {
         synchronized(objects) {
